@@ -1,0 +1,650 @@
+{
+  "clients": [
+    {
+      "id": 1,
+      "name": "Max",
+      "email": "",
+      "phone": "",
+      "company": "JKB Veículos",
+      "stage": "Negociação",
+      "value": 0,
+      "tags": [
+        "Recorrente"
+      ],
+      "createdAt": "2026-04-04",
+      "projeto": "JKB Veículos / Feirão JKB",
+      "servico": "Planejamento e cobertura audiovisual do feirão",
+      "origem": "Cliente recorrente / relacionamento próximo"
+    },
+    {
+      "id": 2,
+      "name": "Cris Piuga",
+      "email": "",
+      "phone": "",
+      "company": "Conexão Família Automotiva",
+      "stage": "Proposta",
+      "value": 2600,
+      "tags": [],
+      "createdAt": "2026-04-04",
+      "projeto": "Conexão Família Automotiva",
+      "servico": "Parceria recorrente de produção de conteúdo",
+      "origem": "Pesquisa Sympla"
+    },
+    {
+      "id": 3,
+      "name": "Jéssica",
+      "email": "",
+      "phone": "",
+      "company": "Auditari",
+      "stage": "Proposta",
+      "value": 0,
+      "tags": [
+        "Indicação"
+      ],
+      "createdAt": "2026-04-04",
+      "projeto": "Auditari",
+      "servico": "Cobertura de evento com foto e vídeo",
+      "origem": "Indicação da Cris Piuga"
+    },
+    {
+      "id": 4,
+      "name": "Bruno Lara",
+      "email": "",
+      "phone": "",
+      "company": "Sense Barbearia",
+      "stage": "Qualificado",
+      "value": 0,
+      "tags": [],
+      "createdAt": "2026-04-04",
+      "projeto": "Sense Barbearia",
+      "servico": "Vídeo institucional e conteúdos para a barbearia",
+      "origem": "Relacionamento pré-existente / cliente da barbearia"
+    },
+    {
+      "id": 5,
+      "name": "Graci",
+      "email": "",
+      "phone": "",
+      "company": "Grupo Lins Ferrão",
+      "stage": "Lead",
+      "value": 0,
+      "tags": [],
+      "createdAt": "2026-04-04",
+      "projeto": "Grupo Lins Ferrão / Gang / Pompéia",
+      "servico": "A definir",
+      "origem": "Contato direto"
+    },
+    {
+      "id": 6,
+      "name": "Mu-Sush",
+      "email": "",
+      "phone": "",
+      "company": "Mu-Sush",
+      "stage": "Lead",
+      "value": 0,
+      "tags": [
+        "Indicação"
+      ],
+      "createdAt": "2026-04-04",
+      "projeto": "Mu-Sush",
+      "servico": "A definir",
+      "origem": "Indicação da Letícia da Growdev"
+    },
+    {
+      "id": 7,
+      "name": "Fábio Vaz",
+      "email": "",
+      "phone": "",
+      "company": "Brasa Fronteiriça",
+      "stage": "Qualificado",
+      "value": 0,
+      "tags": [],
+      "createdAt": "2026-04-04",
+      "projeto": "Brasa Fronteiriça",
+      "servico": "Conteúdo audiovisual para gastronomia / marca",
+      "origem": "Networking no evento da LOLA"
+    },
+    {
+      "id": 8,
+      "name": "Laise",
+      "email": "",
+      "phone": "",
+      "company": "LOLA",
+      "stage": "Qualificado",
+      "value": 0,
+      "tags": [],
+      "createdAt": "2026-04-04",
+      "projeto": "LOLA / Lola Talks",
+      "servico": "Relacionamento para futuros eventos / potencial cobertura audiovisual",
+      "origem": "Instagram"
+    },
+    {
+      "id": 9,
+      "name": "Kamy",
+      "email": "",
+      "phone": "",
+      "company": "Festival de Música Gospel",
+      "stage": "Qualificado",
+      "value": 0,
+      "tags": [],
+      "createdAt": "2026-04-04",
+      "projeto": "Festival de Música Gospel",
+      "servico": "Produção audiovisual / possível clipe oficial / festival",
+      "origem": ""
+    },
+    {
+      "id": 10,
+      "name": "Lucyanna",
+      "email": "",
+      "phone": "",
+      "company": "Agência MKT",
+      "stage": "Lead",
+      "value": 0,
+      "tags": [],
+      "createdAt": "2026-04-04",
+      "projeto": "Agência MKT",
+      "servico": "Produções audiovisuais / publicidade / eventos",
+      "origem": "Grupo Criatives"
+    },
+    {
+      "id": 11,
+      "name": "ACAD Brasil",
+      "email": "",
+      "phone": "",
+      "company": "ACAD Brasil",
+      "stage": "Lead",
+      "value": 0,
+      "tags": [],
+      "createdAt": "2026-04-04",
+      "projeto": "ACAD Brasil + CREF/RS Conexões",
+      "servico": "Cobertura audiovisual institucional",
+      "origem": "Prospecção ativa via WhatsApp"
+    },
+    {
+      "id": 12,
+      "name": "CEISC POA",
+      "email": "",
+      "phone": "",
+      "company": "CEISC POA",
+      "stage": "Lead",
+      "value": 0,
+      "tags": [],
+      "createdAt": "2026-04-04",
+      "projeto": "Simulado Presencial 2ª Fase PC/RS Delegado",
+      "servico": "Cobertura audiovisual institucional / educacional",
+      "origem": "Prospecção ativa via WhatsApp"
+    },
+    {
+      "id": 13,
+      "name": "Lucas Martin",
+      "email": "",
+      "phone": "",
+      "company": "Lucas Martin / Produção do evento",
+      "stage": "Lead",
+      "value": 0,
+      "tags": [],
+      "createdAt": "2026-04-04",
+      "projeto": "Evento Zé Roberto em Porto Alegre",
+      "servico": "Cobertura audiovisual de evento",
+      "origem": "Prospecção ativa via WhatsApp"
+    },
+    {
+      "id": 14,
+      "name": "Daniele",
+      "email": "",
+      "phone": "",
+      "company": "A definir",
+      "stage": "Lead",
+      "value": 0,
+      "tags": [],
+      "createdAt": "2026-04-04",
+      "projeto": "Workshop Alongamento de Molde F1",
+      "servico": "Potencial cobertura audiovisual de workshop",
+      "origem": "Pesquisa Sympla"
+    },
+    {
+      "id": 15,
+      "name": "Daniela Vilas Boas",
+      "email": "",
+      "phone": "",
+      "company": "DVB Academy",
+      "stage": "Lead",
+      "value": 0,
+      "tags": [],
+      "createdAt": "2026-04-04",
+      "projeto": "DVB Academy / Master Class",
+      "servico": "Cobertura audiovisual de masterclass / conteúdo de autoridade",
+      "origem": "Prospecção ativa"
+    },
+    {
+      "id": 16,
+      "name": "Izabel Moreira",
+      "email": "",
+      "phone": "",
+      "company": "Workshop Conexão Plena",
+      "stage": "Lead",
+      "value": 2500,
+      "tags": [],
+      "createdAt": "2026-04-04",
+      "projeto": "Workshop Conexão Plena 2ª Edição",
+      "servico": "Cobertura de evento",
+      "origem": "Pesquisa Sympla"
+    },
+    {
+      "id": 17,
+      "name": "Andressa Ferreira",
+      "email": "",
+      "phone": "",
+      "company": "Conexão Elas RS",
+      "stage": "Lead",
+      "value": 0,
+      "tags": [
+        "Nutrir"
+      ],
+      "createdAt": "2026-04-04",
+      "projeto": "Conexão Elas RS",
+      "servico": "Parceria / ativação de retratos corporativos",
+      "origem": "Prospecção ativa via WhatsApp"
+    },
+    {
+      "id": 18,
+      "name": "Gabi Rodriguez",
+      "email": "",
+      "phone": "",
+      "company": "Workshop Organização Financeira",
+      "stage": "Lead",
+      "value": 2000,
+      "tags": [
+        "Nutrir"
+      ],
+      "createdAt": "2026-04-04",
+      "projeto": "Workshop Organização Financeira",
+      "servico": "Cobertura de evento",
+      "origem": "Pesquisa Sympla"
+    },
+    {
+      "id": 19,
+      "name": "Kátia Magni",
+      "email": "",
+      "phone": "",
+      "company": "3Up Talentos",
+      "stage": "Lead",
+      "value": 0,
+      "tags": [
+        "Nutrir"
+      ],
+      "createdAt": "2026-04-04",
+      "projeto": "3Up Talentos / 2ª Confraria de Executivas",
+      "servico": "Cobertura audiovisual de evento",
+      "origem": "Prospecção ativa via WhatsApp"
+    },
+    {
+      "id": 20,
+      "name": "Vitor",
+      "email": "",
+      "phone": "",
+      "company": "Fotógrafo",
+      "stage": "Lead",
+      "value": 0,
+      "tags": [
+        "Nutrir"
+      ],
+      "createdAt": "2026-04-04",
+      "projeto": "Fotógrafo",
+      "servico": "Parceria / rede profissional",
+      "origem": "Networking no evento da LOLA"
+    },
+    {
+      "id": 21,
+      "name": "Faz Bem Alimentação Saudável",
+      "email": "",
+      "phone": "",
+      "company": "Faz Bem Alimentação Saudável",
+      "stage": "Lead",
+      "value": 0,
+      "tags": [
+        "Nutrir"
+      ],
+      "createdAt": "2026-04-04",
+      "projeto": "Faz Bem Alimentação Saudável",
+      "servico": "Potencial cliente",
+      "origem": "Networking no evento da LOLA"
+    },
+    {
+      "id": 22,
+      "name": "Júnior Cunha",
+      "email": "",
+      "phone": "",
+      "company": "Ousaria Negócios",
+      "stage": "Fechado",
+      "value": 2700,
+      "tags": [
+        "Perdido"
+      ],
+      "createdAt": "2026-04-04",
+      "projeto": "South Summit / Ousaria Negócios",
+      "servico": "Captação pontual estratégica",
+      "origem": "Instagram / anúncio"
+    }
+  ],
+  "interactions": [
+    {
+      "id": 1,
+      "clientId": 1,
+      "clientName": "Max",
+      "type": "Reunião",
+      "note": "Reunião feita, ideia apresentada e vídeo piloto gravado.",
+      "author": "VIVAI",
+      "date": "2026-04-04"
+    },
+    {
+      "id": 2,
+      "clientId": 2,
+      "clientName": "Cris Piuga",
+      "type": "Ligação",
+      "note": "Proposta de R$ 2.600/mês por 3 meses apresentada; achou acessível, mas sem caixa agora.",
+      "author": "VIVAI",
+      "date": "2026-04-04"
+    },
+    {
+      "id": 3,
+      "clientId": 3,
+      "clientName": "Jéssica",
+      "type": "Ligação",
+      "note": "Confirmou recebimento da proposta e está comparando orçamentos.",
+      "author": "VIVAI",
+      "date": "2026-04-04"
+    },
+    {
+      "id": 4,
+      "clientId": 4,
+      "clientName": "Bruno Lara",
+      "type": "Reunião",
+      "note": "Elogiou o perfil, os vídeos e a comunicação, e abriu espaço para conversa presencial.",
+      "author": "VIVAI",
+      "date": "2026-04-04"
+    },
+    {
+      "id": 5,
+      "clientId": 5,
+      "clientName": "Graci",
+      "type": "Ligação",
+      "note": "Disse que falaria com a Bruna; depois pediu indicação de designer e foi atendida.",
+      "author": "VIVAI",
+      "date": "2026-04-04"
+    },
+    {
+      "id": 6,
+      "clientId": 6,
+      "clientName": "Mu-Sush",
+      "type": "Ligação",
+      "note": "Lead vindo por indicação.",
+      "author": "VIVAI",
+      "date": "2026-04-04"
+    },
+    {
+      "id": 7,
+      "clientId": 7,
+      "clientName": "Fábio Vaz",
+      "type": "Ligação",
+      "note": "Foram alinhados para combinar no início da semana.",
+      "author": "VIVAI",
+      "date": "2026-04-04"
+    },
+    {
+      "id": 8,
+      "clientId": 8,
+      "clientName": "Laise",
+      "type": "Reunião",
+      "note": "Convite para encontro confirmado; foco em networking e construção de relação.",
+      "author": "VIVAI",
+      "date": "2026-04-04"
+    },
+    {
+      "id": 9,
+      "clientId": 9,
+      "clientName": "Kamy",
+      "type": "Ligação",
+      "note": "Achou a ideia interessante, mas quer testar primeiro o primeiro evento; já projeta um segundo maior.",
+      "author": "VIVAI",
+      "date": "2026-04-04"
+    },
+    {
+      "id": 10,
+      "clientId": 10,
+      "clientName": "Lucyanna",
+      "type": "E-mail",
+      "note": "Apresentação institucional da VIVAI e da Moropolo enviada.",
+      "author": "VIVAI",
+      "date": "2026-04-04"
+    },
+    {
+      "id": 11,
+      "clientId": 15,
+      "clientName": "Daniela Vilas Boas",
+      "type": "Ligação",
+      "note": "Sem retorno após follow-up.",
+      "author": "VIVAI",
+      "date": "2026-04-04"
+    },
+    {
+      "id": 12,
+      "clientId": 16,
+      "clientName": "Izabel Moreira",
+      "type": "Ligação",
+      "note": "Sem retorno após follow-up.",
+      "author": "VIVAI",
+      "date": "2026-04-04"
+    },
+    {
+      "id": 13,
+      "clientId": 17,
+      "clientName": "Andressa Ferreira",
+      "type": "WhatsApp",
+      "note": "Gostou da proposta, mas já tem parceiro no audiovisual.",
+      "author": "VIVAI",
+      "date": "2026-04-04"
+    },
+    {
+      "id": 14,
+      "clientId": 18,
+      "clientName": "Gabi Rodriguez",
+      "type": "Ligação",
+      "note": "Não fechou este evento, mas abriu porta para próximos.",
+      "author": "VIVAI",
+      "date": "2026-04-04"
+    },
+    {
+      "id": 15,
+      "clientId": 19,
+      "clientName": "Kátia Magni",
+      "type": "WhatsApp",
+      "note": "Já tinham outros profissionais, mas receberam teu portfólio.",
+      "author": "VIVAI",
+      "date": "2026-04-04"
+    },
+    {
+      "id": 16,
+      "clientId": 20,
+      "clientName": "Vitor",
+      "type": "Ligação",
+      "note": "Contato de networking.",
+      "author": "VIVAI",
+      "date": "2026-04-04"
+    },
+    {
+      "id": 17,
+      "clientId": 21,
+      "clientName": "Faz Bem Alimentação Saudável",
+      "type": "Ligação",
+      "note": "Contato de networking.",
+      "author": "VIVAI",
+      "date": "2026-04-04"
+    },
+    {
+      "id": 18,
+      "clientId": 22,
+      "clientName": "Júnior Cunha",
+      "type": "Ligação",
+      "note": "Contato esfriou e o prazo passou.",
+      "author": "VIVAI",
+      "date": "2026-04-04"
+    }
+  ],
+  "tasks": [
+    {
+      "id": 1,
+      "clientId": 1,
+      "clientName": "Max",
+      "title": "Entregar o vídeo e apresentar cronograma de entregas.",
+      "dueDate": "2026-04-04",
+      "priority": "Alta",
+      "assignee": "VIVAI",
+      "done": false,
+      "createdAt": "2026-04-04"
+    },
+    {
+      "id": 2,
+      "clientId": 4,
+      "clientName": "Bruno Lara",
+      "title": "Avisar quando for à barbearia e conduzir conversa presencial.",
+      "dueDate": "2026-04-04",
+      "priority": "Alta",
+      "assignee": "VIVAI",
+      "done": false,
+      "createdAt": "2026-04-04"
+    },
+    {
+      "id": 3,
+      "clientId": 6,
+      "clientName": "Mu-Sush",
+      "title": "Entrar em contato.",
+      "dueDate": "2026-04-04",
+      "priority": "Média",
+      "assignee": "VIVAI",
+      "done": false,
+      "createdAt": "2026-04-04"
+    },
+    {
+      "id": 4,
+      "clientId": 7,
+      "clientName": "Fábio Vaz",
+      "title": "Chamar para agendar reunião presencial.",
+      "dueDate": "2026-04-04",
+      "priority": "Alta",
+      "assignee": "VIVAI",
+      "done": false,
+      "createdAt": "2026-04-04"
+    },
+    {
+      "id": 5,
+      "clientId": 9,
+      "clientName": "Kamy",
+      "title": "Retomar quando houver definição do próximo festival.",
+      "dueDate": "2026-04-04",
+      "priority": "Baixa",
+      "assignee": "VIVAI",
+      "done": false,
+      "createdAt": "2026-04-04"
+    },
+    {
+      "id": 6,
+      "clientId": 10,
+      "clientName": "Lucyanna",
+      "title": "Aguardar resposta.",
+      "dueDate": "2026-04-04",
+      "priority": "Média",
+      "assignee": "VIVAI",
+      "done": false,
+      "createdAt": "2026-04-04"
+    },
+    {
+      "id": 7,
+      "clientId": 11,
+      "clientName": "ACAD Brasil",
+      "title": "Eventual follow-up.",
+      "dueDate": "2026-04-04",
+      "priority": "Média",
+      "assignee": "VIVAI",
+      "done": false,
+      "createdAt": "2026-04-04"
+    },
+    {
+      "id": 8,
+      "clientId": 12,
+      "clientName": "CEISC POA",
+      "title": "Eventual follow-up.",
+      "dueDate": "2026-04-04",
+      "priority": "Média",
+      "assignee": "VIVAI",
+      "done": false,
+      "createdAt": "2026-04-04"
+    },
+    {
+      "id": 9,
+      "clientId": 13,
+      "clientName": "Lucas Martin",
+      "title": "Acompanhar.",
+      "dueDate": "2026-04-04",
+      "priority": "Média",
+      "assignee": "VIVAI",
+      "done": false,
+      "createdAt": "2026-04-04"
+    },
+    {
+      "id": 10,
+      "clientId": 14,
+      "clientName": "Daniele",
+      "title": "Localizar decisor e abordar.",
+      "dueDate": "2026-04-04",
+      "priority": "Média",
+      "assignee": "VIVAI",
+      "done": false,
+      "createdAt": "2026-04-04"
+    },
+    {
+      "id": 11,
+      "clientId": 15,
+      "clientName": "Daniela Vilas Boas",
+      "title": "Retomar só com novo gancho.",
+      "dueDate": "2026-04-04",
+      "priority": "Baixa",
+      "assignee": "VIVAI",
+      "done": false,
+      "createdAt": "2026-04-04"
+    },
+    {
+      "id": 12,
+      "clientId": 17,
+      "clientName": "Andressa Ferreira",
+      "title": "Manter porta aberta.",
+      "dueDate": "2026-04-04",
+      "priority": "Baixa",
+      "assignee": "VIVAI",
+      "done": false,
+      "createdAt": "2026-04-04"
+    },
+    {
+      "id": 13,
+      "clientId": 19,
+      "clientName": "Kátia Magni",
+      "title": "Retomar no futuro.",
+      "dueDate": "2026-04-04",
+      "priority": "Baixa",
+      "assignee": "VIVAI",
+      "done": false,
+      "createdAt": "2026-04-04"
+    },
+    {
+      "id": 14,
+      "clientId": 21,
+      "clientName": "Faz Bem Alimentação Saudável",
+      "title": "Avaliar abordagem futura.",
+      "dueDate": "2026-04-04",
+      "priority": "Baixa",
+      "assignee": "VIVAI",
+      "done": false,
+      "createdAt": "2026-04-04"
+    }
+  ]
+}
