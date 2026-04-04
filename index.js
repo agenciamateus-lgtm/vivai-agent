@@ -22,12 +22,35 @@ const twilioClient = twilio(
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 
-// ── Health check ──────────────────────────────────────────────────────────────
+// ── Dashboard ─────────────────────────────────────────────────────────────────
+const path = require("path");
+const fs   = require("fs");
+const DATA_FILE = path.join(__dirname, "crm-data.json");
+
 app.get("/", (req, res) => {
-  res.json({
-    status: "🌿 VIVAI Agent online",
-    timestamp: new Date().toISOString(),
-  });
+  res.sendFile(path.join(__dirname, "dashboard.html"));
+});
+
+// API: leitura dos dados
+app.get("/api/data", (req, res) => {
+  try {
+    const data = fs.existsSync(DATA_FILE) ? JSON.parse(fs.readFileSync(DATA_FILE, "utf-8")) : { clients: [], interactions: [], tasks: [] };
+    res.json(data);
+  } catch (e) {
+    res.json({ clients: [], interactions: [], tasks: [] });
+  }
+});
+
+// API: atualização parcial dos dados
+app.post("/api/data", (req, res) => {
+  try {
+    const current = fs.existsSync(DATA_FILE) ? JSON.parse(fs.readFileSync(DATA_FILE, "utf-8")) : { clients: [], interactions: [], tasks: [] };
+    const updated = { ...current, ...req.body };
+    fs.writeFileSync(DATA_FILE, JSON.stringify(updated, null, 2));
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ── Webhook do WhatsApp (Twilio) ──────────────────────────────────────────────
