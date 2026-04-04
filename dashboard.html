@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VIVAI CRM</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #F5F0E8; font-family: 'DM Sans', sans-serif; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #E8DFD0; border-radius: 3px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+const C = {
+  forest:"#1C3829",moss:"#2D5A3D",sage:"#4A7C59",mint:"#7FB896",
+  cream:"#F5F0E8",sand:"#E8DFD0",gold:"#C9A84C",charcoal:"#1A1A1A",
+  muted:"#6B7B6E",white:"#FFFFFF",danger:"#C0392B",warning:"#E67E22",success:"#27AE60",
+};
+const STAGES = ["Lead","Qualificado","Proposta","Negociação","Fechado"];
+const STAGE_COLORS = {Lead:"#7FB896",Qualificado:"#4A7C59",Proposta:"#C9A84C",Negociação:"#E67E22",Fechado:"#27AE60"};
+const INTERACTION_TYPES = ["Ligação","E-mail","Reunião","WhatsApp","Visita"];
+const TASK_PRIORITIES = ["Alta","Média","Baixa"];
+const fmt = v => new Intl.NumberFormat("pt-BR",{style:"currency",currency:"BRL",maximumFractionDigits:0}).format(v);
+const today = () => new Date().toISOString().split("T")[0];
+
+function Avatar({name,size=36}){
+  const initials=name.split(" ").slice(0,2).map(n=>n[0]).join("").toUpperCase();
+  const colors=["#4A7C59","#2D5A3D","#C9A84C","#7FB896","#1C3829"];
+  const bg=colors[name.charCodeAt(0)%colors.length];
+  return <div style={{width:size,height:size,borderRadius:"50%",background:bg,display:"flex",alignItems:"center",justifyContent:"center",color:"#fff",fontSize:size*0.35,fontWeight:600,flexShrink:0}}>{initials}</div>;
+}
+
+function Badge({label,color=C.moss}){
+  return <span style={{background:color+"22",color,border:`1px solid ${color}44`,borderRadius:20,padding:"2px 10px",fontSize:11,fontWeight:600,letterSpacing:0.3}}>{label}</span>;
+}
+
+function KpiCard({icon,label,value,sub,accent}){
+  return <div style={{background:C.white,borderRadius:16,padding:"24px 28px",border:`1px solid ${C.sand}`,position:"relative",overflow:"hidden"}}>
+    <div style={{position:"absolute",top:0,left:0,width:4,height:"100%",background:accent,borderRadius:"4px 0 0 4px"}}/>
+    <div style={{fontSize:28,marginBottom:8}}>{icon}</div>
+    <div style={{fontSize:13,color:C.muted,fontWeight:500,marginBottom:4}}>{label}</div>
+    <div style={{fontFamily:"'Playfair Display',serif",fontSize:28,fontWeight:700,color:C.charcoal,lineHeight:1}}>{value}</div>
+    {sub&&<div style={{fontSize:12,color:C.muted,marginTop:6}}>{sub}</div>}
+  </div>;
+}
+
+function Modal({title,onClose,children}){
+  return <div style={{position:"fixed",inset:0,background:"rgba(28,56,41,0.55)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
+    <div style={{background:C.white,borderRadius:20,width:"100%",maxWidth:520,maxHeight:"90vh",overflow:"auto",boxShadow:"0 24px 80px rgba(0,0,0,0.2)"}}>
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"24px 28px 16px",borderBottom:`1px solid ${C.sand}`}}>
+        <h3 style={{fontFamily:"'Playfair Display',serif",fontSize:20,color:C.forest}}>{title}</h3>
+        <button onClick={onClose} style={{background:"none",border:"none",fontSize:22,cursor:"pointer",color:C.muted}}>×</button>
+      </div>
+      <div style={{padding:"24px 28px"}}>{children}</div>
+    </div>
+  </div>;
+}
+
+function Input({label,...props}){
+  return <div style={{marginBottom:16}}>
+    {label&&<label style={{fontSize:12,fontWeight:600,color:C.muted,display:"block",marginBottom:6,textTransform:"uppercase",letterSpacing:0.8}}>{label}</label>}
+    <input {...props} style={{width:"100%",padding:"10px 14px",border:`1px solid ${C.sand}`,borderRadius:10,fontSize:14,color:C.charcoal,background:C.cream,outline:"none",boxSizing:"border-box",...props.style}}/>
+  </div>;
+}
+
+function Sel({label,options,...props}){
+  return <div style={{marginBottom:16}}>
+    {label&&<label style={{fontSize:12,fontWeight:600,color:C.muted,display:"block",marginBottom:6,textTransform:"uppercase",letterSpacing:0.8}}>{label}</label>}
+    <select {...props} style={{width:"100%",padding:"10px 14px",border:`1px solid ${C.sand}`,borderRadius:10,fontSize:14,color:C.charcoal,background:C.cream,outline:"none",boxSizing:"border-box"}}>
+      {options.map(o=><option key={o} value={o}>{o}</option>)}
+    </select>
+  </div>;
+}
+
+function Btn({children,variant="primary",onClick,style={}}){
+  const s={primary:{background:C.forest,color:C.cream,border:"none"},secondary:{background:"transparent",color:C.forest,border:`1.5px solid ${C.forest}`},ghost:{background:C.sand,color:C.charcoal,border:"none"}};
+  return <button onClick={onClick} style={{...s[variant],padding:"10px 20px",borderRadius:10,fontSize:14,fontWeight:600,cursor:"pointer",...style}}>{children}</button>;
+}
+
+function Dashboard({clients,interactions,tasks}){
+  const totalPipeline=clients.reduce((s,c)=>s+c.value,0);
+  const closed=clients.filter(c=>c.stage==="Fechado");
+  const closedValue=closed.reduce((s,c)=>s+c.value,0);
+  const pendingTasks=tasks.filter(t=>!t.done).length;
+  const overdue=tasks.filter(t=>!t.done&&t.dueDate<today()).length;
+  const stageData=STAGES.map(s=>({stage:s,count:clients.filter(c=>c.stage===s).length,value:clients.filter(c=>c.stage===s).reduce((a,c)=>a+c.value,0)}));
+  const maxVal=Math.max(...stageData.map(d=>d.value),1);
+  const recent=[...interactions].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,4);
+  return <div>
+    <div style={{marginBottom:32}}>
+      <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:32,color:C.forest,marginBottom:6}}>Visão Geral</h1>
+      <p style={{color:C.muted}}>Bem-vindo de volta. Aqui está o resumo do seu pipeline.</p>
+    </div>
+    <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:16,marginBottom:32}}>
+      <KpiCard icon="🌿" label="Total no Pipeline" value={fmt(totalPipeline)} sub={`${clients.length} clientes ativos`} accent={C.sage}/>
+      <KpiCard icon="✅" label="Negócios Fechados" value={fmt(closedValue)} sub={`${closed.length} contratos`} accent={C.gold}/>
+      <KpiCard icon="📋" label="Tarefas Pendentes" value={pendingTasks} sub={overdue>0?`⚠️ ${overdue} em atraso`:"Tudo em dia"} accent={overdue>0?C.danger:C.mint}/>
+      <KpiCard icon="💬" label="Interações (total)" value={interactions.length} sub="Registros no histórico" accent={C.moss}/>
+    </div>
+    <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:24}}>
+      <div style={{background:C.white,borderRadius:16,padding:24,border:`1px solid ${C.sand}`}}>
+        <h3 style={{fontFamily:"'Playfair Display',serif",color:C.forest,marginBottom:20}}>Pipeline por Etapa</h3>
+        {stageData.map(d=><div key={d.stage} style={{marginBottom:14}}>
+          <div style={{display:"flex",justifyContent:"space-between",marginBottom:5}}>
+            <span style={{fontSize:13,fontWeight:500}}>{d.stage}</span>
+            <span style={{fontSize:12,color:C.muted}}>{d.count} · {fmt(d.value)}</span>
+          </div>
+          <div style={{background:C.sand,borderRadius:6,height:8,overflow:"hidden"}}>
+            <div style={{width:`${(d.value/maxVal)*100}%`,height:"100%",background:STAGE_COLORS[d.stage],borderRadius:6}}/>
+          </div>
+        </div>)}
+      </div>
+      <div style={{background:C.white,borderRadius:16,padding:24,border:`1px solid ${C.sand}`}}>
+        <h3 style={{fontFamily:"'Playfair Display',serif",color:C.forest,marginBottom:20}}>Últimas Interações</h3>
+        {recent.map(i=>{const client=clients.find(c=>c.id===i.clientId);return <div key={i.id} style={{display:"flex",gap:12,marginBottom:14,paddingBottom:14,borderBottom:`1px solid ${C.sand}`}}>
+          {client&&<Avatar name={client.name} size={36}/>}
+          <div style={{flex:1,minWidth:0}}>
+            <div style={{fontSize:13,fontWeight:600,color:C.charcoal}}>{client?.name}</div>
+            <div style={{fontSize:12,color:C.muted,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{i.note}</div>
+          </div>
+          <Badge label={i.type} color={C.sage}/>
+        </div>;})}
+      </div>
+    </div>
+  </div>;
+}
+
+function Clients({clients,setClients}){
+  const [search,setSearch]=useState("");
+  const [modal,setModal]=useState(null);
+  const [form,setForm]=useState({});
+  const filtered=clients.filter(c=>c.name.toLowerCase().includes(search.toLowerCase())||c.company.toLowerCase().includes(search.toLowerCase()));
+  const openNew=()=>{setForm({name:"",email:"",phone:"",company:"",stage:"Lead",value:"",tags:""});setModal("new");};
+  const openEdit=c=>{setForm({...c,tags:c.tags.join(", ")});setModal(c);};
+  const save=()=>{
+    const data={...form,value:Number(form.value)||0,tags:form.tags?form.tags.split(",").map(t=>t.trim()).filter(Boolean):[]};
+    if(modal==="new")setClients(prev=>[...prev,{...data,id:Date.now(),createdAt:today()}]);
+    else setClients(prev=>prev.map(c=>c.id===modal.id?{...c,...data}:c));
+    setModal(null);
+  };
+  const del=id=>{if(confirm("Remover cliente?"))setClients(prev=>prev.filter(c=>c.id!==id));};
+  return <div>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:28}}>
+      <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:32,color:C.forest}}>Clientes</h1>
+      <Btn onClick={openNew}>+ Novo Cliente</Btn>
+    </div>
+    <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="🔍  Buscar por nome ou empresa..." style={{width:"100%",padding:"12px 16px",border:`1px solid ${C.sand}`,borderRadius:12,fontSize:14,background:C.white,marginBottom:20,outline:"none"}}/>
+    <div style={{display:"grid",gap:12}}>
+      {filtered.map(c=><div key={c.id} style={{background:C.white,borderRadius:14,padding:"18px 22px",border:`1px solid ${C.sand}`,display:"flex",alignItems:"center",gap:16}}>
+        <Avatar name={c.name} size={44}/>
+        <div style={{flex:1,minWidth:0}}>
+          <div style={{fontWeight:600,fontSize:15,color:C.charcoal}}>{c.name}</div>
+          <div style={{fontSize:13,color:C.muted}}>{c.company} · {c.email}</div>
+        </div>
+        <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",justifyContent:"flex-end"}}>
+          <Badge label={c.stage} color={STAGE_COLORS[c.stage]}/>
+          <span style={{fontWeight:700,fontSize:14,color:C.forest}}>{fmt(c.value)}</span>
+          {c.tags.map(t=><Badge key={t} label={t} color={C.gold}/>)}
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={()=>openEdit(c)} style={{background:C.sand,border:"none",borderRadius:8,padding:"6px 12px",cursor:"pointer",fontSize:13}}>Editar</button>
+          <button onClick={()=>del(c.id)} style={{background:"#fde8e8",border:"none",borderRadius:8,padding:"6px 12px",cursor:"pointer",fontSize:13,color:C.danger}}>✕</button>
+        </div>
+      </div>)}
+    </div>
+    {modal&&<Modal title={modal==="new"?"Novo Cliente":"Editar Cliente"} onClose={()=>setModal(null)}>
+      <Input label="Nome completo" value={form.name} onChange={e=>setForm(p=>({...p,name:e.target.value}))} placeholder="Maria Silva"/>
+      <Input label="E-mail" value={form.email} onChange={e=>setForm(p=>({...p,email:e.target.value}))}/>
+      <Input label="Telefone" value={form.phone} onChange={e=>setForm(p=>({...p,phone:e.target.value}))}/>
+      <Input label="Empresa" value={form.company} onChange={e=>setForm(p=>({...p,company:e.target.value}))}/>
+      <Sel label="Etapa" value={form.stage} onChange={e=>setForm(p=>({...p,stage:e.target.value}))} options={STAGES}/>
+      <Input label="Valor (R$)" type="number" value={form.value} onChange={e=>setForm(p=>({...p,value:e.target.value}))}/>
+      <Input label="Tags (separadas por vírgula)" value={form.tags} onChange={e=>setForm(p=>({...p,tags:e.target.value}))}/>
+      <div style={{display:"flex",gap:10,justifyContent:"flex-end",marginTop:8}}>
+        <Btn variant="secondary" onClick={()=>setModal(null)}>Cancelar</Btn>
+        <Btn onClick={save}>Salvar</Btn>
+      </div>
+    </Modal>}
+  </div>;
+}
+
+function Pipeline({clients,setClients}){
+  const [dragging,setDragging]=useState(null);
+  const [over,setOver]=useState(null);
+  const drop=stage=>{if(dragging)setClients(prev=>prev.map(c=>c.id===dragging?{...c,stage}:c));setDragging(null);setOver(null);};
+  return <div>
+    <div style={{marginBottom:28}}>
+      <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:32,color:C.forest,marginBottom:6}}>Pipeline de Vendas</h1>
+      <p style={{color:C.muted}}>Arraste os cards entre as etapas para atualizar o status.</p>
+    </div>
+    <div style={{display:"flex",gap:14,overflowX:"auto",paddingBottom:16}}>
+      {STAGES.map(stage=>{
+        const cols=clients.filter(c=>c.stage===stage);
+        const total=cols.reduce((s,c)=>s+c.value,0);
+        return <div key={stage} onDragOver={e=>{e.preventDefault();setOver(stage);}} onDrop={()=>drop(stage)} onDragLeave={()=>setOver(null)} style={{minWidth:220,flex:"0 0 220px",background:over===stage?C.sand:C.cream,borderRadius:16,padding:16,border:`2px dashed ${over===stage?STAGE_COLORS[stage]:"transparent"}`}}>
+          <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:12}}>
+            <div style={{width:10,height:10,borderRadius:"50%",background:STAGE_COLORS[stage]}}/>
+            <span style={{fontWeight:700,fontSize:13,color:C.charcoal,textTransform:"uppercase",letterSpacing:0.6}}>{stage}</span>
+            <span style={{marginLeft:"auto",fontSize:12,color:C.muted}}>{cols.length}</span>
+          </div>
+          <div style={{fontSize:11,color:C.muted,marginBottom:14}}>{fmt(total)}</div>
+          <div style={{display:"flex",flexDirection:"column",gap:10}}>
+            {cols.map(c=><div key={c.id} draggable onDragStart={()=>setDragging(c.id)} onDragEnd={()=>{setDragging(null);setOver(null);}} style={{background:C.white,borderRadius:12,padding:"14px 16px",border:`1px solid ${C.sand}`,cursor:"grab",opacity:dragging===c.id?0.5:1}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+                <Avatar name={c.name} size={28}/>
+                <span style={{fontWeight:600,fontSize:13,color:C.charcoal}}>{c.name}</span>
+              </div>
+              <div style={{fontSize:11,color:C.muted,marginBottom:8}}>{c.company}</div>
+              <div style={{fontSize:13,fontWeight:700,color:C.forest}}>{fmt(c.value)}</div>
+            </div>)}
+          </div>
+        </div>;
+      })}
+    </div>
+  </div>;
+}
+
+function Interactions({interactions,setInteractions,clients}){
+  const [modal,setModal]=useState(false);
+  const [form,setForm]=useState({clientId:"",type:"Ligação",date:today(),note:"",author:""});
+  const [filter,setFilter]=useState("all");
+  const filtered=filter==="all"?interactions:interactions.filter(i=>i.type===filter);
+  const sorted=[...filtered].sort((a,b)=>b.date.localeCompare(a.date));
+  const save=()=>{setInteractions(prev=>[...prev,{...form,id:Date.now(),clientId:Number(form.clientId)}]);setModal(false);setForm({clientId:"",type:"Ligação",date:today(),note:"",author:""}); };
+  const typeIcon={Ligação:"📞","E-mail":"✉️",Reunião:"🤝",WhatsApp:"💬",Visita:"🏢"};
+  return <div>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
+      <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:32,color:C.forest}}>Histórico de Interações</h1>
+      <Btn onClick={()=>setModal(true)}>+ Nova Interação</Btn>
+    </div>
+    <div style={{display:"flex",gap:8,marginBottom:20,flexWrap:"wrap"}}>
+      {["all",...INTERACTION_TYPES].map(t=><button key={t} onClick={()=>setFilter(t)} style={{padding:"7px 16px",borderRadius:20,border:"none",cursor:"pointer",fontSize:13,fontWeight:500,background:filter===t?C.forest:C.sand,color:filter===t?C.cream:C.charcoal}}>{t==="all"?"Todos":t}</button>)}
+    </div>
+    <div style={{display:"grid",gap:12}}>
+      {sorted.map(i=>{const client=clients.find(c=>c.id===i.clientId);return <div key={i.id} style={{background:C.white,borderRadius:14,padding:"18px 22px",border:`1px solid ${C.sand}`,display:"flex",gap:16,alignItems:"flex-start"}}>
+        <div style={{fontSize:26,flexShrink:0}}>{typeIcon[i.type]||"💬"}</div>
+        <div style={{flex:1}}>
+          <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:6,flexWrap:"wrap"}}>
+            <span style={{fontWeight:700,fontSize:14,color:C.charcoal}}>{client?.name||"Cliente"}</span>
+            <Badge label={i.type} color={C.sage}/>
+            <span style={{fontSize:12,color:C.muted}}>{i.date} · por {i.author}</span>
+          </div>
+          <p style={{fontSize:14,color:C.charcoal,lineHeight:1.6}}>{i.note}</p>
+        </div>
+      </div>;})}
+    </div>
+    {modal&&<Modal title="Registrar Interação" onClose={()=>setModal(false)}>
+      <div style={{marginBottom:16}}>
+        <label style={{fontSize:12,fontWeight:600,color:C.muted,display:"block",marginBottom:6,textTransform:"uppercase",letterSpacing:0.8}}>Cliente</label>
+        <select value={form.clientId} onChange={e=>setForm(p=>({...p,clientId:e.target.value}))} style={{width:"100%",padding:"10px 14px",border:`1px solid ${C.sand}`,borderRadius:10,fontSize:14,background:C.cream,outline:"none",boxSizing:"border-box"}}>
+          <option value="">Selecione...</option>
+          {clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+      </div>
+      <Sel label="Tipo" value={form.type} onChange={e=>setForm(p=>({...p,type:e.target.value}))} options={INTERACTION_TYPES}/>
+      <Input label="Data" type="date" value={form.date} onChange={e=>setForm(p=>({...p,date:e.target.value}))}/>
+      <Input label="Responsável" value={form.author} onChange={e=>setForm(p=>({...p,author:e.target.value}))}/>
+      <div style={{marginBottom:16}}>
+        <label style={{fontSize:12,fontWeight:600,color:C.muted,display:"block",marginBottom:6,textTransform:"uppercase",letterSpacing:0.8}}>Anotação</label>
+        <textarea value={form.note} onChange={e=>setForm(p=>({...p,note:e.target.value}))} rows={4} style={{width:"100%",padding:"10px 14px",border:`1px solid ${C.sand}`,borderRadius:10,fontSize:14,background:C.cream,outline:"none",resize:"vertical",boxSizing:"border-box"}}/>
+      </div>
+      <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
+        <Btn variant="secondary" onClick={()=>setModal(false)}>Cancelar</Btn>
+        <Btn onClick={save}>Salvar</Btn>
+      </div>
+    </Modal>}
+  </div>;
+}
+
+function Tasks({tasks,setTasks,clients}){
+  const [modal,setModal]=useState(false);
+  const [form,setForm]=useState({clientId:"",title:"",dueDate:today(),priority:"Média",assignee:""});
+  const [filter,setFilter]=useState("pending");
+  const filtered=filter==="pending"?tasks.filter(t=>!t.done):filter==="done"?tasks.filter(t=>t.done):tasks;
+  const sorted=[...filtered].sort((a,b)=>a.dueDate.localeCompare(b.dueDate));
+  const toggle=id=>setTasks(prev=>prev.map(t=>t.id===id?{...t,done:!t.done}:t));
+  const del=id=>setTasks(prev=>prev.filter(t=>t.id!==id));
+  const save=()=>{setTasks(prev=>[...prev,{...form,id:Date.now(),clientId:Number(form.clientId),done:false}]);setModal(false);setForm({clientId:"",title:"",dueDate:today(),priority:"Média",assignee:""});};
+  const prioC={Alta:C.danger,Média:C.warning,Baixa:C.mint};
+  return <div>
+    <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
+      <h1 style={{fontFamily:"'Playfair Display',serif",fontSize:32,color:C.forest}}>Tarefas & Follow-up</h1>
+      <Btn onClick={()=>setModal(true)}>+ Nova Tarefa</Btn>
+    </div>
+    <div style={{display:"flex",gap:8,marginBottom:20}}>
+      {[["pending","Pendentes"],["done","Concluídas"],["all","Todas"]].map(([v,l])=><button key={v} onClick={()=>setFilter(v)} style={{padding:"7px 16px",borderRadius:20,border:"none",cursor:"pointer",fontSize:13,fontWeight:500,background:filter===v?C.forest:C.sand,color:filter===v?C.cream:C.charcoal}}>{l}</button>)}
+    </div>
+    <div style={{display:"grid",gap:10}}>
+      {sorted.map(t=>{const client=clients.find(c=>c.id===t.clientId);const isOverdue=!t.done&&t.dueDate<today();return <div key={t.id} style={{background:C.white,borderRadius:14,padding:"16px 20px",border:`1px solid ${isOverdue?"#f5b7b1":C.sand}`,display:"flex",gap:14,alignItems:"center",opacity:t.done?0.6:1}}>
+        <button onClick={()=>toggle(t.id)} style={{width:24,height:24,borderRadius:6,border:`2px solid ${t.done?C.success:C.sand}`,background:t.done?C.success:"transparent",color:"#fff",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>{t.done&&"✓"}</button>
+        <div style={{flex:1}}>
+          <div style={{fontWeight:600,fontSize:14,color:C.charcoal,textDecoration:t.done?"line-through":"none"}}>{t.title}</div>
+          <div style={{fontSize:12,color:C.muted,marginTop:3}}>{client?.name} · {t.assignee} · {isOverdue?<span style={{color:C.danger}}>⚠️ Vencida em {t.dueDate}</span>:t.dueDate}</div>
+        </div>
+        <Badge label={t.priority} color={prioC[t.priority]}/>
+        <button onClick={()=>del(t.id)} style={{background:"none",border:"none",cursor:"pointer",color:C.muted,fontSize:16}}>✕</button>
+      </div>;})}
+    </div>
+    {modal&&<Modal title="Nova Tarefa" onClose={()=>setModal(false)}>
+      <div style={{marginBottom:16}}>
+        <label style={{fontSize:12,fontWeight:600,color:C.muted,display:"block",marginBottom:6,textTransform:"uppercase",letterSpacing:0.8}}>Cliente</label>
+        <select value={form.clientId} onChange={e=>setForm(p=>({...p,clientId:e.target.value}))} style={{width:"100%",padding:"10px 14px",border:`1px solid ${C.sand}`,borderRadius:10,fontSize:14,background:C.cream,outline:"none",boxSizing:"border-box"}}>
+          <option value="">Selecione...</option>
+          {clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+      </div>
+      <Input label="Título da tarefa" value={form.title} onChange={e=>setForm(p=>({...p,title:e.target.value}))}/>
+      <Input label="Data limite" type="date" value={form.dueDate} onChange={e=>setForm(p=>({...p,dueDate:e.target.value}))}/>
+      <Sel label="Prioridade" value={form.priority} onChange={e=>setForm(p=>({...p,priority:e.target.value}))} options={TASK_PRIORITIES}/>
+      <Input label="Responsável" value={form.assignee} onChange={e=>setForm(p=>({...p,assignee:e.target.value}))}/>
+      <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
+        <Btn variant="secondary" onClick={()=>setModal(false)}>Cancelar</Btn>
+        <Btn onClick={save}>Salvar</Btn>
+      </div>
+    </Modal>}
+  </div>;
+}
+
+function App(){
+  const [view,setView]=useState("dashboard");
+  const [clients,setClients]=useState([]);
+  const [interactions,setInteractions]=useState([]);
+  const [tasks,setTasks]=useState([]);
+
+  useEffect(()=>{
+    fetch("/api/data").then(r=>r.json()).then(d=>{
+      if(d.clients)setClients(d.clients);
+      if(d.interactions)setInteractions(d.interactions);
+      if(d.tasks)setTasks(d.tasks);
+    }).catch(()=>{});
+  },[]);
+
+  const save=(key,data)=>{
+    fetch("/api/data",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({[key]:data})}).catch(()=>{});
+  };
+
+  const setC=v=>{const d=typeof v==="function"?v(clients):v;setClients(d);save("clients",d);};
+  const setI=v=>{const d=typeof v==="function"?v(interactions):v;setInteractions(d);save("interactions",d);};
+  const setT=v=>{const d=typeof v==="function"?v(tasks):v;setTasks(d);save("tasks",d);};
+
+  const NAV=[{id:"dashboard",icon:"◈",label:"Dashboard"},{id:"clients",icon:"👤",label:"Clientes"},{id:"pipeline",icon:"⟶",label:"Pipeline"},{id:"interactions",icon:"💬",label:"Interações"},{id:"tasks",icon:"✓",label:"Tarefas"}];
+
+  return <div style={{display:"flex",minHeight:"100vh",background:C.cream}}>
+    <aside style={{width:240,background:C.forest,display:"flex",flexDirection:"column",position:"fixed",left:0,top:0,height:"100vh",zIndex:100}}>
+      <div style={{padding:"28px 24px 24px",borderBottom:"1px solid rgba(255,255,255,0.08)"}}>
+        <div style={{display:"flex",alignItems:"center",gap:10}}>
+          <div style={{width:36,height:36,background:C.gold,borderRadius:10,display:"flex",alignItems:"center",justifyContent:"center",fontSize:18}}>🌿</div>
+          <div>
+            <div style={{fontFamily:"'Playfair Display',serif",fontSize:20,fontWeight:700,color:C.cream,lineHeight:1}}>VIVAI</div>
+            <div style={{fontSize:10,color:C.mint,letterSpacing:2,textTransform:"uppercase"}}>CRM</div>
+          </div>
+        </div>
+      </div>
+      <nav style={{flex:1,padding:"16px 12px"}}>
+        {NAV.map(n=>{const active=view===n.id;return <button key={n.id} onClick={()=>setView(n.id)} style={{width:"100%",display:"flex",alignItems:"center",gap:12,padding:"12px 16px",borderRadius:12,border:"none",background:active?"rgba(255,255,255,0.12)":"transparent",color:active?C.cream:"rgba(255,255,255,0.55)",fontSize:14,fontWeight:active?600:400,cursor:"pointer",marginBottom:4,textAlign:"left"}}>
+          <span style={{fontSize:16,width:20,textAlign:"center"}}>{n.icon}</span>
+          {n.label}
+          {active&&<div style={{marginLeft:"auto",width:6,height:6,borderRadius:"50%",background:C.gold}}/>}
+        </button>;})}
+      </nav>
+      <div style={{padding:"16px 24px",borderTop:"1px solid rgba(255,255,255,0.08)"}}>
+        <div style={{fontFamily:"'DM Sans',sans-serif",fontSize:11,color:C.mint,textAlign:"center"}}>VIVAI Audiovisual · CRM</div>
+      </div>
+    </aside>
+    <main style={{marginLeft:240,flex:1,padding:"40px 40px",minHeight:"100vh"}}>
+      {view==="dashboard"&&<Dashboard clients={clients} interactions={interactions} tasks={tasks}/>}
+      {view==="clients"&&<Clients clients={clients} setClients={setC}/>}
+      {view==="pipeline"&&<Pipeline clients={clients} setClients={setC}/>}
+      {view==="interactions"&&<Interactions interactions={interactions} setInteractions={setI} clients={clients}/>}
+      {view==="tasks"&&<Tasks tasks={tasks} setTasks={setT} clients={clients}/>}
+    </main>
+  </div>;
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
