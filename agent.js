@@ -1,36 +1,72 @@
 /**
- * agent.js — Agente de IA da VIVAI com Tool Use
- * Usa Claude claude-sonnet-4-20250514 com ferramentas para operar o CRM
+ * agent.js — Agente VIVAI com Visão, Áudio e Tool Use
+ * Processa texto, imagens (prints, cartões, anúncios) e áudios do WhatsApp
  */
 
 const Anthropic = require("@anthropic-ai/sdk");
 const crm = require("./crm");
+const https = require("https");
+const http = require("http");
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-// ── Histórico de conversa por usuário (em memória — por sessão) ───────────────
+// ── Histórico por usuário ─────────────────────────────────────────────────────
 const conversationHistory = new Map();
-
 function getHistory(userId) {
   if (!conversationHistory.has(userId)) conversationHistory.set(userId, []);
   return conversationHistory.get(userId);
 }
+function clearHistory(userId) { conversationHistory.set(userId, []); }
 
-function clearHistory(userId) {
-  conversationHistory.set(userId, []);
+// ── Download de mídia do Twilio ───────────────────────────────────────────────
+function downloadMedia(url, accountSid, authToken) {
+  return new Promise((resolve, reject) => {
+    const auth = Buffer.from(`${accountSid}:${authToken}`).toString("base64");
+    const lib = url.startsWith("https") ? https : http;
+    lib.get(url, { headers: { Authorization: `Basic ${auth}` } }, (res) => {
+      if (res.statusCode === 302 || res.statusCode === 301) {
+        return downloadMedia(res.headers.location, accountSid, authToken).then(resolve).catch(reject);
+      }
+      const chunks = [];
+      res.on("data", (chunk) => chunks.push(chunk));
+      res.on("end", () => resolve({ buffer: Buffer.concat(chunks), contentType: res.headers["content-type"] }));
+      res.on("error", reject);
+    }).on("error", reject);
+  });
 }
 
-// ── Definição das ferramentas do CRM ──────────────────────────────────────────
+// ── Transcrição de áudio via OpenAI Whisper ───────────────────────────────────
+async function transcribeAudio(audioBuffer, contentType) {
+  if (!process.env.OPENAI_API_KEY) {
+    return "[Áudio recebido — adicione OPENAI_API_KEY nas variáveis do Railway para transcrição automática]";
+  }
+  try {
+    const FormData = require("form-data");
+    const fetch = (...args) => import("node-fetch").then(({default: f}) => f(...args));
+    const ext = contentType?.includes("ogg") ? "ogg" : contentType?.includes("mp4") ? "mp4" : "mp3";
+    const form = new FormData();
+    form.append("file", audioBuffer, { filename: `audio.${ext}`, contentType });
+    form.append("model", "whisper-1");
+    form.append("language", "pt");
+    const res = await (await fetch)("https://api.openai.com/v1/audio/transcriptions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, ...form.getHeaders() },
+      body: form,
+    });
+    const data = await res.json();
+    return data.text || "[Não foi possível transcrever o áudio]";
+  } catch (err) {
+    console.error("Erro na transcrição:", err.message);
+    return "[Erro ao transcrever áudio]";
+  }
+}
+
+// ── Ferramentas do CRM ────────────────────────────────────────────────────────
 const CRM_TOOLS = [
   {
     name: "listar_clientes",
     description: "Lista os clientes do CRM. Pode filtrar por nome ou empresa.",
-    input_schema: {
-      type: "object",
-      properties: {
-        busca: { type: "string", description: "Texto para filtrar (opcional)" },
-      },
-    },
+    input_schema: { type: "object", properties: { busca: { type: "string" } } },
   },
   {
     name: "adicionar_cliente",
@@ -38,12 +74,13 @@ const CRM_TOOLS = [
     input_schema: {
       type: "object",
       properties: {
-        name:    { type: "string", description: "Nome completo do cliente" },
-        email:   { type: "string", description: "E-mail" },
-        phone:   { type: "string", description: "Telefone" },
-        company: { type: "string", description: "Empresa" },
+        name:    { type: "string", description: "Nome completo" },
+        email:   { type: "string" },
+        phone:   { type: "string" },
+        company: { type: "string" },
         stage:   { type: "string", enum: ["Lead", "Qualificado", "Proposta", "Negociação", "Fechado"] },
-        value:   { type: "number", description: "Valor estimado do negócio em R$" },
+        value:   { type: "number" },
+        tags:    { type: "array", items: { type: "string" } },
       },
       required: ["name"],
     },
@@ -54,7 +91,7 @@ const CRM_TOOLS = [
     input_schema: {
       type: "object",
       properties: {
-        clientName: { type: "string", description: "Nome (ou parte do nome) do cliente" },
+        clientName: { type: "string" },
         newStage:   { type: "string", enum: ["Lead", "Qualificado", "Proposta", "Negociação", "Fechado"] },
       },
       required: ["clientName", "newStage"],
@@ -62,27 +99,22 @@ const CRM_TOOLS = [
   },
   {
     name: "registrar_interacao",
-    description: "Registra uma interação com um cliente (ligação, reunião, e-mail, WhatsApp, visita).",
+    description: "Registra uma interação com um cliente.",
     input_schema: {
       type: "object",
       properties: {
-        clientName: { type: "string", description: "Nome do cliente" },
+        clientName: { type: "string" },
         type:       { type: "string", enum: ["Ligação", "E-mail", "Reunião", "WhatsApp", "Visita"] },
-        note:       { type: "string", description: "Resumo da interação" },
-        author:     { type: "string", description: "Nome de quem está registrando" },
+        note:       { type: "string" },
+        author:     { type: "string" },
       },
       required: ["clientName", "type", "note"],
     },
   },
   {
     name: "listar_tarefas",
-    description: "Lista as tarefas pendentes ou todas as tarefas.",
-    input_schema: {
-      type: "object",
-      properties: {
-        apenasPendentes: { type: "boolean", description: "true para mostrar só pendentes" },
-      },
-    },
+    description: "Lista as tarefas pendentes.",
+    input_schema: { type: "object", properties: { apenasPendentes: { type: "boolean" } } },
   },
   {
     name: "adicionar_tarefa",
@@ -90,151 +122,173 @@ const CRM_TOOLS = [
     input_schema: {
       type: "object",
       properties: {
-        clientName: { type: "string", description: "Nome do cliente relacionado" },
-        title:      { type: "string", description: "Título da tarefa" },
-        dueDate:    { type: "string", description: "Data limite (YYYY-MM-DD)" },
+        clientName: { type: "string" },
+        title:      { type: "string" },
+        dueDate:    { type: "string", description: "YYYY-MM-DD" },
         priority:   { type: "string", enum: ["Alta", "Média", "Baixa"] },
-        assignee:   { type: "string", description: "Responsável pela tarefa" },
+        assignee:   { type: "string" },
       },
       required: ["clientName", "title"],
     },
   },
   {
     name: "concluir_tarefa",
-    description: "Marca uma tarefa como concluída pelo seu ID.",
-    input_schema: {
-      type: "object",
-      properties: {
-        taskId: { type: "number", description: "ID numérico da tarefa" },
-      },
-      required: ["taskId"],
-    },
+    description: "Marca uma tarefa como concluída.",
+    input_schema: { type: "object", properties: { taskId: { type: "number" } }, required: ["taskId"] },
   },
   {
     name: "resumo_dashboard",
-    description: "Retorna um resumo completo do CRM: pipeline, negócios fechados, tarefas.",
+    description: "Retorna resumo completo do CRM.",
     input_schema: { type: "object", properties: {} },
   },
 ];
 
-// ── Execução das ferramentas ───────────────────────────────────────────────────
+// ── Execução das ferramentas ──────────────────────────────────────────────────
 function executeTool(name, input) {
   switch (name) {
     case "listar_clientes": {
       const clients = crm.listClients(input.busca || "");
-      if (clients.length === 0) return "Nenhum cliente encontrado.";
-      return clients
-        .map(
-          (c) =>
-            `• *${c.name}* (${c.company || "—"}) | ${c.stage} | R$ ${c.value?.toLocaleString("pt-BR") || 0}`
-        )
-        .join("\n");
+      if (!clients.length) return "Nenhum cliente encontrado.";
+      return clients.map(c => `• *${c.name}* (${c.company||"—"}) | ${c.stage} | R$ ${(c.value||0).toLocaleString("pt-BR")}`).join("\n");
     }
-
     case "adicionar_cliente": {
       const c = crm.addClient(input);
-      return `✅ Cliente *${c.name}* adicionado com sucesso! ID: ${c.id}`;
+      return `✅ Cliente *${c.name}* adicionado! ID: ${c.id}`;
     }
-
     case "atualizar_etapa": {
       const c = crm.updateStage(input.clientName, input.newStage);
       if (!c) return `❌ Cliente "${input.clientName}" não encontrado.`;
-      return `✅ *${c.name}* movido para *${c.stage}* no pipeline.`;
+      return `✅ *${c.name}* movido para *${c.stage}*.`;
     }
-
     case "registrar_interacao": {
       const i = crm.addInteraction(input);
       if (!i) return `❌ Cliente "${input.clientName}" não encontrado.`;
       return `✅ Interação registrada para *${i.clientName}* (${i.type}).`;
     }
-
     case "listar_tarefas": {
       const tasks = crm.listTasks(input.apenasPendentes !== false);
-      if (tasks.length === 0) return "Nenhuma tarefa encontrada.";
-      const today = new Date().toISOString().split("T")[0];
-      return tasks
-        .map((t) => {
-          const overdue = !t.done && t.dueDate < today ? "⚠️ " : "";
-          const status = t.done ? "✅" : "⏳";
-          return `${status} ${overdue}*[${t.id}]* ${t.title} — ${t.clientName} | ${t.dueDate} | ${t.priority}`;
-        })
-        .join("\n");
+      if (!tasks.length) return "Nenhuma tarefa encontrada.";
+      const t = new Date().toISOString().split("T")[0];
+      return tasks.map(tk => `${tk.done?"✅":"⏳"}${!tk.done&&tk.dueDate<t?" ⚠️":""} *[${tk.id}]* ${tk.title} — ${tk.clientName} | ${tk.dueDate} | ${tk.priority}`).join("\n");
     }
-
     case "adicionar_tarefa": {
       const t = crm.addTask(input);
-      return `✅ Tarefa *"${t.title}"* criada para ${t.clientName} (vence em ${t.dueDate}).`;
+      return `✅ Tarefa *"${t.title}"* criada para ${t.clientName} (vence ${t.dueDate}).`;
     }
-
     case "concluir_tarefa": {
       const t = crm.completeTask(input.taskId);
-      if (!t) return `❌ Tarefa ID ${input.taskId} não encontrada.`;
-      return `✅ Tarefa *"${t.title}"* marcada como concluída!`;
+      if (!t) return `❌ Tarefa ${input.taskId} não encontrada.`;
+      return `✅ Tarefa *"${t.title}"* concluída!`;
     }
-
     case "resumo_dashboard": {
       const s = crm.getDashboardSummary();
-      const fmt = (v) => `R$ ${v.toLocaleString("pt-BR")}`;
-      const pipeline = s.byStage
-        .map((b) => `  › ${b.stage}: ${b.count} clientes (${fmt(b.value)})`)
-        .join("\n");
+      const fmt = v => `R$ ${v.toLocaleString("pt-BR")}`;
       return [
-        `📊 *Resumo VIVAI CRM*`,
-        ``,
+        `📊 *Resumo VIVAI CRM*`, ``,
         `👥 Clientes: ${s.totalClients}`,
         `💰 Pipeline total: ${fmt(s.totalPipeline)}`,
         `✅ Fechados: ${s.closedDeals} negócios (${fmt(s.closedValue)})`,
-        `📋 Tarefas pendentes: ${s.pendingTasks}${s.overdueTasks > 0 ? ` (⚠️ ${s.overdueTasks} em atraso)` : ""}`,
-        `💬 Interações registradas: ${s.totalInteractions}`,
-        ``,
+        `📋 Tarefas pendentes: ${s.pendingTasks}${s.overdueTasks>0?` (⚠️ ${s.overdueTasks} em atraso)`:""}`,
+        `💬 Interações: ${s.totalInteractions}`, ``,
         `*Pipeline por etapa:*`,
-        pipeline,
+        ...s.byStage.map(b => `  › ${b.stage}: ${b.count} clientes (${fmt(b.value)})`),
       ].join("\n");
     }
-
-    default:
-      return `Ferramenta desconhecida: ${name}`;
+    default: return `Ferramenta desconhecida: ${name}`;
   }
 }
 
-// ── Prompt do sistema ─────────────────────────────────────────────────────────
-const SYSTEM_PROMPT = `Você é o assistente de IA da VIVAI, uma empresa especializada em soluções de crescimento.
-Você opera via WhatsApp e tem acesso total ao CRM da empresa.
+// ── System prompt ─────────────────────────────────────────────────────────────
+const SYSTEM_PROMPT = `Você é o assistente de IA da VIVAI Audiovisual, operando via WhatsApp.
+Você tem acesso total ao CRM e capacidade de analisar imagens e textos transcritos de áudio.
 
-Suas responsabilidades:
-- Consultar e atualizar clientes no pipeline
-- Registrar interações e follow-ups
-- Gerenciar tarefas da equipe
-- Dar resumos rápidos do dashboard
+QUANDO RECEBER UMA IMAGEM, analise e extraia automaticamente:
+- 📱 Prints de conversa (WhatsApp, Instagram, DM): nome do contato, telefone/user, assunto, interesse demonstrado, contexto
+- 💼 Cartões de visita: nome, empresa, cargo, telefone, e-mail
+- 👤 Perfis de redes sociais (Instagram, LinkedIn, Facebook): nome, empresa, segmento, possível serviço de interesse
+- 📢 Anúncios: empresa anunciante, produto/serviço, contato se visível
+- 🌐 Sites: nome da empresa, segmento, contato disponível
+- 📧 E-mails: remetente, assunto, contexto, próximos passos
+- 📝 Anotações escritas: qualquer dado de cliente, tarefa ou follow-up
 
-Estilo de comunicação:
-- Seja conciso, objetivo e amigável
-- Use emojis com moderação para tornar as mensagens mais legíveis
+FLUXO AUTOMÁTICO AO RECEBER IMAGEM:
+1. Informe o que identificou na imagem (resumo rápido)
+2. Cadastre o cliente no CRM (se ainda não existir)
+3. Registre a interação com contexto extraído
+4. Crie tarefa de follow-up se houver próximo passo claro
+5. Confirme tudo que foi salvo
+
+QUANDO RECEBER ÁUDIO TRANSCRITO:
+- Trate como nota de voz com informações de cliente ou tarefa
+- Extraia e cadastre dados relevantes automaticamente
+
+REGRAS:
+- Se o nome do cliente não estiver claro na imagem, use o nome do perfil/contato visível
+- Stage padrão para novos contatos: "Lead"
+- Seja conciso — confirme o cadastro em poucas linhas
 - Responda sempre em português brasileiro
-- Para ações no CRM, confirme o que foi feito de forma clara
-- Se não tiver informações suficientes para executar uma ação, peça o mínimo necessário
+- Se realmente não conseguir identificar nenhum dado útil, informe o que viu e peça mais contexto
 
-Hoje é: ${new Date().toLocaleDateString("pt-BR", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}`;
+Hoje é: ${new Date().toLocaleDateString("pt-BR", { weekday:"long", year:"numeric", month:"long", day:"numeric" })}`;
 
-// ── Função principal de processamento ────────────────────────────────────────
-async function processMessage(userId, userMessage) {
+// ── Processamento principal ───────────────────────────────────────────────────
+async function processMessage(userId, userMessage, mediaList = []) {
   const history = getHistory(userId);
 
-  // Limpar histórico se o usuário pedir
-  if (/^(limpar|reiniciar|reset|nova conversa)/i.test(userMessage.trim())) {
+  if (/^(limpar|reiniciar|reset|nova conversa)/i.test(userMessage?.trim())) {
     clearHistory(userId);
     return "🔄 Conversa reiniciada! Como posso ajudar?";
   }
 
-  history.push({ role: "user", content: userMessage });
+  const content = [];
 
-  // Loop de tool use (agente autônomo)
+  // Processar mídias (imagens e áudios)
+  for (const media of mediaList) {
+    try {
+      const { buffer, contentType } = await downloadMedia(
+        media.url,
+        process.env.TWILIO_ACCOUNT_SID,
+        process.env.TWILIO_AUTH_TOKEN
+      );
+
+      const isImage = contentType?.startsWith("image/");
+      const isAudio = contentType?.includes("audio") || contentType?.includes("ogg") || contentType?.includes("mpeg");
+
+      if (isImage) {
+        const mediaType = contentType.includes("png") ? "image/png"
+          : contentType.includes("gif") ? "image/gif"
+          : contentType.includes("webp") ? "image/webp" : "image/jpeg";
+        content.push({ type: "image", source: { type: "base64", media_type: mediaType, data: buffer.toString("base64") } });
+        console.log(`🖼️ Imagem recebida (${mediaType}, ${Math.round(buffer.length/1024)}KB)`);
+      } else if (isAudio) {
+        console.log(`🎤 Áudio recebido, transcrevendo...`);
+        const transcription = await transcribeAudio(buffer, contentType);
+        content.push({ type: "text", text: `[Áudio transcrito]: ${transcription}` });
+        console.log(`📝 Transcrição: ${transcription.substring(0, 100)}`);
+      }
+    } catch (err) {
+      console.error(`❌ Erro ao processar mídia: ${err.message}`);
+    }
+  }
+
+  // Texto da mensagem
+  if (userMessage?.trim()) {
+    content.push({ type: "text", text: userMessage });
+  }
+
+  // Imagem sem texto → instrução implícita
+  if (mediaList.length > 0 && !userMessage?.trim()) {
+    content.push({ type: "text", text: "Analise esta imagem e cadastre os dados relevantes no CRM da VIVAI." });
+  }
+
+  if (!content.length) content.push({ type: "text", text: "Olá!" });
+
+  history.push({ role: "user", content });
+
+  // Loop agente
   let iterations = 0;
-  const MAX_ITER = 5;
-
-  while (iterations < MAX_ITER) {
+  while (iterations < 6) {
     iterations++;
-
     const response = await client.messages.create({
       model: "claude-sonnet-4-20250514",
       max_tokens: 1024,
@@ -243,43 +297,27 @@ async function processMessage(userId, userMessage) {
       messages: history,
     });
 
-    // Adicionar resposta ao histórico
     history.push({ role: "assistant", content: response.content });
 
-    // Resposta final sem mais ferramentas
     if (response.stop_reason === "end_turn") {
-      const text = response.content
-        .filter((b) => b.type === "text")
-        .map((b) => b.text)
-        .join("");
-      return text;
+      return response.content.filter(b => b.type === "text").map(b => b.text).join("");
     }
 
-    // Processar tool_use
     if (response.stop_reason === "tool_use") {
       const toolResults = [];
-
       for (const block of response.content) {
         if (block.type === "tool_use") {
           console.log(`🔧 Tool: ${block.name}`, block.input);
-          const result = executeTool(block.name, block.input);
-          toolResults.push({
-            type: "tool_result",
-            tool_use_id: block.id,
-            content: result,
-          });
+          toolResults.push({ type: "tool_result", tool_use_id: block.id, content: executeTool(block.name, block.input) });
         }
       }
-
-      // Adicionar resultados ao histórico
       history.push({ role: "user", content: toolResults });
       continue;
     }
-
     break;
   }
 
-  return "Desculpe, não consegui processar sua solicitação. Tente novamente.";
+  return "Desculpe, não consegui processar. Tente novamente.";
 }
 
 module.exports = { processMessage };
