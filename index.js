@@ -59,23 +59,30 @@ app.post("/webhook/whatsapp", async (req, res) => {
   // Validação de assinatura ignorada no sandbox — segura para desenvolvimento
   // Para produção com número aprovado, reativar a validação
 
-  const from    = req.body.From;   // Ex: whatsapp:+5511999999999
-  const to      = req.body.To;     // Número Twilio
-  const message = req.body.Body?.trim();
+  const from    = req.body.From;
+  const message = req.body.Body?.trim() || "";
+  const numMedia = parseInt(req.body.NumMedia || "0", 10);
 
-  if (!message || !from) {
-    return res.status(400).send("Bad Request");
+  if (!from) return res.status(400).send("Bad Request");
+
+  // Coletar mídias (imagens, áudios)
+  const mediaList = [];
+  for (let i = 0; i < numMedia; i++) {
+    mediaList.push({
+      url: req.body[`MediaUrl${i}`],
+      contentType: req.body[`MediaContentType${i}`],
+    });
   }
 
-  console.log(`📩 [${from}]: ${message}`);
+  console.log(`📩 [${from}]: ${message || "(sem texto)"}${mediaList.length ? ` + ${mediaList.length} mídia(s)` : ""}`);
 
-  // Resposta imediata ao Twilio (evita timeout de 15s)
+  // Resposta imediata ao Twilio
   res.set("Content-Type", "text/xml");
   res.send("<Response></Response>");
 
-  // Processar com IA de forma assíncrona
+  // Processar com IA
   try {
-    const reply = await processMessage(from, message);
+    const reply = await processMessage(from, message, mediaList);
     console.log(`🤖 [resposta para ${from}]: ${reply.substring(0, 100)}...`);
 
     await twilioClient.messages.create({
