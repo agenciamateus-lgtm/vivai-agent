@@ -22,16 +22,33 @@ function clearHistory(userId) { conversationHistory.set(userId, []); }
 function downloadMedia(url, accountSid, authToken) {
   return new Promise((resolve, reject) => {
     const auth = Buffer.from(`${accountSid}:${authToken}`).toString("base64");
-    const lib = url.startsWith("https") ? https : http;
-    lib.get(url, { headers: { Authorization: `Basic ${auth}` } }, (res) => {
-      if (res.statusCode === 302 || res.statusCode === 301) {
-        return downloadMedia(res.headers.location, accountSid, authToken).then(resolve).catch(reject);
-      }
-      const chunks = [];
-      res.on("data", (chunk) => chunks.push(chunk));
-      res.on("end", () => resolve({ buffer: Buffer.concat(chunks), contentType: res.headers["content-type"] }));
-      res.on("error", reject);
-    }).on("error", reject);
+
+    function doRequest(targetUrl, redirectCount) {
+      if (redirectCount > 5) return reject(new Error("Too many redirects"));
+      const lib = targetUrl.startsWith("https") ? https : http;
+      const parsed = new URL(targetUrl);
+      const options = {
+        hostname: parsed.hostname,
+        path: parsed.pathname + parsed.search,
+        headers: { "Authorization": `Basic ${auth}` },
+        method: "GET",
+      };
+      lib.request(options, (res) => {
+        if ([301, 302, 307].includes(res.statusCode)) {
+          return doRequest(res.headers.location, redirectCount + 1);
+        }
+        if (res.statusCode !== 200) {
+          return reject(new Error(`HTTP ${res.statusCode}`));
+        }
+        const contentType = res.headers["content-type"] || "";
+        const chunks = [];
+        res.on("data", (c) => chunks.push(c));
+        res.on("end", () => resolve({ buffer: Buffer.concat(chunks), contentType }));
+        res.on("error", reject);
+      }).on("error", reject).end();
+    }
+
+    doRequest(url, 0);
   });
 }
 
