@@ -52,26 +52,83 @@ function downloadMedia(url, accountSid, authToken) {
   });
 }
 
-// ── Transcrição de áudio via OpenAI Whisper ───────────────────────────────────
+// ── Transcrição de áudio via OpenAI Whisper (usando https nativo) ─────────────
 async function transcribeAudio(audioBuffer, contentType) {
   if (!process.env.OPENAI_API_KEY) {
-    return "[Áudio recebido — adicione OPENAI_API_KEY nas variáveis do Railway para transcrição automática]";
+    return "[Áudio recebido — adicione OPENAI_API_KEY para transcrição automática]";
   }
   try {
-    const FormData = require("form-data");
-    const fetch = (...args) => import("node-fetch").then(({default: f}) => f(...args));
-    const ext = contentType?.includes("ogg") ? "ogg" : contentType?.includes("mp4") ? "mp4" : "mp3";
-    const form = new FormData();
-    form.append("file", audioBuffer, { filename: `audio.${ext}`, contentType });
-    form.append("model", "whisper-1");
-    form.append("language", "pt");
-    const res = await (await fetch)("https://api.openai.com/v1/audio/transcriptions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, ...form.getHeaders() },
-      body: form,
+    const ext = contentType?.includes("ogg") ? "ogg"
+              : contentType?.includes("mp4") ? "mp4"
+              : contentType?.includes("3gpp") ? "3gp" : "mp3";
+    const boundary = "----VIVAIBoundary" + Date.now();
+    const filename = `audio.${ext}`;
+
+    // Montar multipart/form-data manualmente
+    const parts = [];
+    parts.push(Buffer.from(
+      `--${boundary}
+` +
+      `Content-Disposition: form-data; name="model"
+
+whisper-1
+`
+    ));
+    parts.push(Buffer.from(
+      `--${boundary}
+` +
+      `Content-Disposition: form-data; name="language"
+
+pt
+`
+    ));
+    parts.push(Buffer.from(
+      `--${boundary}
+` +
+      `Content-Disposition: form-data; name="file"; filename="${filename}"
+` +
+      `Content-Type: ${contentType || "audio/ogg"}
+
+`
+    ));
+    parts.push(audioBuffer);
+    parts.push(Buffer.from(`
+--${boundary}--
+`));
+
+    const body = Buffer.concat(parts);
+
+    return new Promise((resolve) => {
+      const options = {
+        hostname: "api.openai.com",
+        path: "/v1/audio/transcriptions",
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
+          "Content-Type": `multipart/form-data; boundary=${boundary}`,
+          "Content-Length": body.length,
+        },
+      };
+      const req = https.request(options, (res) => {
+        const chunks = [];
+        res.on("data", (c) => chunks.push(c));
+        res.on("end", () => {
+          try {
+            const data = JSON.parse(Buffer.concat(chunks).toString());
+            console.log("🎤 Resposta Whisper:", JSON.stringify(data).substring(0, 200));
+            resolve(data.text || "[Áudio recebido mas sem conteúdo identificado]");
+          } catch (e) {
+            resolve("[Erro ao interpretar resposta do Whisper]");
+          }
+        });
+      });
+      req.on("error", (e) => {
+        console.error("Erro Whisper:", e.message);
+        resolve("[Erro de conexão com Whisper]");
+      });
+      req.write(body);
+      req.end();
     });
-    const data = await res.json();
-    return data.text || "[Não foi possível transcrever o áudio]";
   } catch (err) {
     console.error("Erro na transcrição:", err.message);
     return "[Erro ao transcrever áudio]";
@@ -280,17 +337,19 @@ async function processMessage(userId, userMessage, mediaList = []) {
                       media.contentType?.includes("audio") ||
                       media.contentType?.includes("ogg");
 
-      if (isImage) {
+      if (isAudio) {
+        console.log(`🎤 Áudio recebido (${contentType}), transcrevendo...`);
+        const transcription = await transcribeAudio(buffer, contentType);
+        console.log(`📝 Transcrição: ${transcription.substring(0, 150)}`);
+        content.push({ type: "text", text: `[Áudio transcrito do WhatsApp]: ${transcription}` });
+      } else if (isImage) {
         const mediaType = contentType.includes("png") ? "image/png"
           : contentType.includes("gif") ? "image/gif"
           : contentType.includes("webp") ? "image/webp" : "image/jpeg";
         content.push({ type: "image", source: { type: "base64", media_type: mediaType, data: buffer.toString("base64") } });
         console.log(`🖼️ Imagem recebida (${mediaType}, ${Math.round(buffer.length/1024)}KB)`);
-      } else if (isAudio) {
-        console.log(`🎤 Áudio recebido, transcrevendo...`);
-        const transcription = await transcribeAudio(buffer, contentType);
-        content.push({ type: "text", text: `[Áudio transcrito]: ${transcription}` });
-        console.log(`📝 Transcrição: ${transcription.substring(0, 100)}`);
+      } else {
+        console.log(`❓ Tipo de mídia não reconhecido: ${contentType}`);
       }
     } catch (err) {
       console.error(`❌ Erro ao processar mídia: ${err.message}`);
