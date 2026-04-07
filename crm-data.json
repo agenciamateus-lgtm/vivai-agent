@@ -198,7 +198,7 @@
       "value": 0,
       "tags": [],
       "createdAt": "2026-04-04",
-      "projeto": "Workshop Alongamento de Molde F1",
+      "projeto": "Workshop Alongamento de Molde F1 e Blindagem com Esmaltação em Gel",
       "servico": "Potencial cobertura audiovisual de workshop",
       "origem": "Pesquisa Sympla"
     },
@@ -212,7 +212,7 @@
       "value": 0,
       "tags": [],
       "createdAt": "2026-04-04",
-      "projeto": "DVB Academy / Master Class",
+      "projeto": "DVB Academy / Master Class Dermo Beauty Expert",
       "servico": "Cobertura audiovisual de masterclass / conteúdo de autoridade",
       "origem": "Prospecção ativa"
     },
@@ -251,14 +251,14 @@
       "name": "Gabi Rodriguez",
       "email": "",
       "phone": "",
-      "company": "Workshop Organização Financeira",
+      "company": "Workshop Organização Financeira para Mulheres",
       "stage": "Lead",
       "value": 2000,
       "tags": [
         "Nutrir"
       ],
       "createdAt": "2026-04-04",
-      "projeto": "Workshop Organização Financeira",
+      "projeto": "Workshop Organização Financeira para Mulheres",
       "servico": "Cobertura de evento",
       "origem": "Pesquisa Sympla"
     },
@@ -645,6 +645,39 @@
       "assignee": "VIVAI",
       "done": false,
       "createdAt": "2026-04-04"
+    },
+    {
+      "id": 15,
+      "clientId": 2,
+      "clientName": "Cris Piuga",
+      "title": "Aguardar retorno, sem alterar orçamento por enquanto.",
+      "dueDate": "2026-04-07",
+      "priority": "Alta",
+      "assignee": "VIVAI",
+      "done": false,
+      "createdAt": "2026-04-07"
+    },
+    {
+      "id": 16,
+      "clientId": 3,
+      "clientName": "Jéssica",
+      "title": "Aguardar retorno.",
+      "dueDate": "2026-04-07",
+      "priority": "Alta",
+      "assignee": "VIVAI",
+      "done": false,
+      "createdAt": "2026-04-07"
+    },
+    {
+      "id": 17,
+      "clientId": 5,
+      "clientName": "Graci",
+      "title": "Aguardar retorno e manter relacionamento.",
+      "dueDate": "2026-04-07",
+      "priority": "Média",
+      "assignee": "VIVAI",
+      "done": false,
+      "createdAt": "2026-04-07"
     }
   ]
 }
