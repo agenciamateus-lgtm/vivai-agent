@@ -260,7 +260,9 @@ async function processMessage(userId, userMessage, mediaList = []) {
   const content = [];
 
   // Processar mídias (imagens e áudios)
+  console.log(`📦 Total de mídias recebidas: ${mediaList.length}`);
   for (const media of mediaList) {
+    console.log(`📎 Mídia: url=${media.url?.substring(0,60)} contentType=${media.contentType}`);
     try {
       const { buffer, contentType } = await downloadMedia(
         media.url,
@@ -269,7 +271,14 @@ async function processMessage(userId, userMessage, mediaList = []) {
       );
 
       const isImage = contentType?.startsWith("image/");
-      const isAudio = contentType?.includes("audio") || contentType?.includes("ogg") || contentType?.includes("mpeg");
+      const isAudio = contentType?.includes("audio") || 
+                      contentType?.includes("ogg") || 
+                      contentType?.includes("mpeg") ||
+                      contentType?.includes("opus") ||
+                      contentType?.includes("mp4") ||
+                      contentType?.includes("3gpp") ||
+                      media.contentType?.includes("audio") ||
+                      media.contentType?.includes("ogg");
 
       if (isImage) {
         const mediaType = contentType.includes("png") ? "image/png"
