@@ -52,51 +52,32 @@ function downloadMedia(url, accountSid, authToken) {
   });
 }
 
-// ── Transcrição de áudio via OpenAI Whisper (usando https nativo) ─────────────
+// ── Transcrição de áudio via OpenAI Whisper ─────────────────────────────────
 async function transcribeAudio(audioBuffer, contentType) {
   if (!process.env.OPENAI_API_KEY) {
-    return "[Áudio recebido — adicione OPENAI_API_KEY para transcrição automática]";
+    return "[Adicione OPENAI_API_KEY no Railway para transcrição de áudio]";
   }
   try {
-    const ext = contentType?.includes("ogg") ? "ogg"
-              : contentType?.includes("mp4") ? "mp4"
-              : contentType?.includes("3gpp") ? "3gp" : "mp3";
-    const boundary = "----VIVAIBoundary" + Date.now();
-    const filename = `audio.${ext}`;
+    // Usar boundary simples e bem formatado
+    const boundary = "boundary" + Math.random().toString(36).substring(2);
+    const CRLF = "\r\n";
 
-    // Montar multipart/form-data manualmente
-    const parts = [];
-    parts.push(Buffer.from(
-      `--${boundary}
-` +
-      `Content-Disposition: form-data; name="model"
-
-whisper-1
-`
-    ));
-    parts.push(Buffer.from(
-      `--${boundary}
-` +
-      `Content-Disposition: form-data; name="language"
-
-pt
-`
-    ));
-    parts.push(Buffer.from(
-      `--${boundary}
-` +
-      `Content-Disposition: form-data; name="file"; filename="${filename}"
-` +
-      `Content-Type: ${contentType || "audio/ogg"}
-
-`
-    ));
-    parts.push(audioBuffer);
-    parts.push(Buffer.from(`
---${boundary}--
-`));
-
-    const body = Buffer.concat(parts);
+    const header = Buffer.from(
+      "--" + boundary + CRLF +
+      'Content-Disposition: form-data; name="model"' + CRLF + CRLF +
+      "whisper-1" + CRLF +
+      "--" + boundary + CRLF +
+      'Content-Disposition: form-data; name="language"' + CRLF + CRLF +
+      "pt" + CRLF +
+      "--" + boundary + CRLF +
+      'Content-Disposition: form-data; name="response_format"' + CRLF + CRLF +
+      "text" + CRLF +
+      "--" + boundary + CRLF +
+      'Content-Disposition: form-data; name="file"; filename="audio.ogg"' + CRLF +
+      "Content-Type: audio/ogg" + CRLF + CRLF
+    );
+    const footer = Buffer.from(CRLF + "--" + boundary + "--" + CRLF);
+    const body = Buffer.concat([header, audioBuffer, footer]);
 
     return new Promise((resolve) => {
       const options = {
@@ -104,36 +85,44 @@ pt
         path: "/v1/audio/transcriptions",
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`,
-          "Content-Type": `multipart/form-data; boundary=${boundary}`,
+          "Authorization": "Bearer " + process.env.OPENAI_API_KEY,
+          "Content-Type": "multipart/form-data; boundary=" + boundary,
           "Content-Length": body.length,
         },
       };
+
       const req = https.request(options, (res) => {
         const chunks = [];
         res.on("data", (c) => chunks.push(c));
         res.on("end", () => {
-          try {
-            const data = JSON.parse(Buffer.concat(chunks).toString());
-            console.log("🎤 Resposta Whisper:", JSON.stringify(data).substring(0, 200));
-            resolve(data.text || "[Áudio recebido mas sem conteúdo identificado]");
-          } catch (e) {
-            resolve("[Erro ao interpretar resposta do Whisper]");
+          const raw = Buffer.concat(chunks).toString("utf-8");
+          console.log("🎤 Whisper status:", res.statusCode, "resposta:", raw.substring(0, 200));
+          // response_format=text retorna texto puro, não JSON
+          if (res.statusCode === 200) {
+            resolve(raw.trim() || "[Áudio sem conteúdo identificado]");
+          } else {
+            try {
+              const data = JSON.parse(raw);
+              resolve("[Erro Whisper: " + (data.error?.message || raw.substring(0,100)) + "]");
+            } catch {
+              resolve("[Erro Whisper: " + raw.substring(0, 100) + "]");
+            }
           }
         });
       });
       req.on("error", (e) => {
         console.error("Erro Whisper:", e.message);
-        resolve("[Erro de conexão com Whisper]");
+        resolve("[Erro de conexão com Whisper: " + e.message + "]");
       });
       req.write(body);
       req.end();
     });
   } catch (err) {
     console.error("Erro na transcrição:", err.message);
-    return "[Erro ao transcrever áudio]";
+    return "[Erro ao transcrever áudio: " + err.message + "]";
   }
 }
+
 
 // ── Ferramentas do CRM ────────────────────────────────────────────────────────
 const CRM_TOOLS = [
