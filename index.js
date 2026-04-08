@@ -145,6 +145,26 @@ app.post("/api/quote/pdf", async (req, res) => {
   }
 });
 
+
+// ── Proxy IA — chat do painel de lead ────────────────────────────────────────
+app.post("/api/chat", async (req, res) => {
+  try {
+    const { system, messages, max_tokens } = req.body;
+    const Anthropic = require("@anthropic-ai/sdk");
+    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+    const response = await client.messages.create({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: max_tokens || 600,
+      system,
+      messages,
+    });
+    res.json({ content: response.content });
+  } catch (err) {
+    console.error("❌ /api/chat error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Start ─────────────────────────────────────────────────────────────────────
 app.listen(port, () => {
   console.log(`\n🌿 VIVAI Agent rodando na porta ${port}`);
