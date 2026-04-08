@@ -177,7 +177,7 @@ function Btn({children, variant="primary", onClick, style={}}) {
 
 // ══ VIEWS ══════════════════════════════════════════════════════════════
 
-function Dashboard({clients, interactions, tasks}) {
+function Dashboard({clients, interactions, tasks, leadScores, analyzing, onAnalyze}) {
   const totalPipeline = clients.reduce((s,c)=>s+c.value,0);
   const closed = clients.filter(c=>c.stage==="Fechado");
   const closedValue = closed.reduce((s,c)=>s+c.value,0);
@@ -187,15 +187,80 @@ function Dashboard({clients, interactions, tasks}) {
   const maxVal = Math.max(...stageData.map(d=>d.value),1);
   const recent = [...interactions].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,5);
 
+  // ── Smart Alerts ───────────────────────────────────────────────────────────
+  const alerts = [];
+  const now = today();
+  // Overdue tasks
+  if(overdue.length>0) alerts.push({type:"danger",icon:"⚠️",msg:`${overdue.length} tarefa${overdue.length>1?"s":""} vencida${overdue.length>1?"s":""} — ação imediata necessária`});
+  // Leads without contact > 7 days
+  clients.filter(c=>c.stage!=="Fechado").forEach(c=>{
+    const lastInt = interactions.filter(i=>i.clientId===c.id).sort((a,b)=>b.date.localeCompare(a.date))[0];
+    if(lastInt){
+      const diff = Math.floor((new Date(now)-new Date(lastInt.date))/(1000*60*60*24));
+      if(diff>=14) alerts.push({type:"warning",icon:"🔕",msg:`${c.name} está há ${diff} dias sem contato`,clientId:c.id});
+    }
+  });
+  // Hot leads (score >= 70) without tasks
+  Object.entries(leadScores).forEach(([id,s])=>{
+    if(s.score>=70){
+      const hasPending = tasks.some(t=>t.clientId===Number(id)&&!t.done);
+      if(!hasPending){
+        const c = clients.find(x=>x.id===Number(id));
+        if(c) alerts.push({type:"info",icon:"🔥",msg:`${c.name} tem score ${s.score}% — sem tarefas pendentes`});
+      }
+    }
+  });
+  // Hot leads in proposal for > 10 days
+  clients.filter(c=>c.stage==="Proposta").forEach(c=>{
+    const lastInt = interactions.filter(i=>i.clientId===c.id).sort((a,b)=>b.date.localeCompare(a.date))[0];
+    if(lastInt){
+      const diff = Math.floor((new Date(now)-new Date(lastInt.date))/(1000*60*60*24));
+      if(diff>=10) alerts.push({type:"warning",icon:"💼",msg:`${c.name} está em Proposta há ${diff} dias sem movimentação`});
+    }
+  });
+
+  const alertColors = {danger:"rgba(255,45,120,0.12)",warning:"rgba(255,184,0,0.1)",info:"rgba(0,212,255,0.08)"};
+  const alertBorders = {danger:"rgba(255,45,120,0.4)",warning:"rgba(255,184,0,0.3)",info:"rgba(0,212,255,0.2)"};
+  const alertTextColors = {danger:"#ff2d78",warning:"#ffb800",info:"#00d4ff"};
+
+  // Top leads by score
+  const topLeads = clients
+    .filter(c=>leadScores[c.id])
+    .map(c=>({...c, score:leadScores[c.id]}))
+    .sort((a,b)=>(b.score.score||0)-(a.score.score||0))
+    .slice(0,5);
+
   return (
     <div className="fade-in">
-      <div style={{marginBottom:32}}>
-        <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:38,letterSpacing:2,lineHeight:1,marginBottom:6}}>
-          <GradText>Visão Geral</GradText>
+      <div style={{marginBottom:32,display:"flex",alignItems:"flex-start",justifyContent:"space-between"}}>
+        <div>
+          <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:32,letterSpacing:2,lineHeight:1,marginBottom:6}}><GradText>Visão Geral</GradText></div>
+          <p style={{color:"#7a9bb5",margin:0,fontSize:14}}>Bem-vindo de volta. Aqui está o resumo do pipeline da VIVAI.</p>
         </div>
-        <div style={{color:"#7a9bb5",fontSize:14}}>Bem-vindo de volta. Aqui está o resumo do pipeline da VIVAI.</div>
+        <button onClick={onAnalyze} disabled={analyzing}
+          style={{padding:"9px 18px",borderRadius:8,border:"1px solid rgba(0,212,255,0.3)",
+            background:analyzing?"rgba(0,212,255,0.05)":"rgba(0,212,255,0.08)",
+            color:"#00d4ff",fontSize:13,fontWeight:600,cursor:analyzing?"wait":"pointer",
+            fontFamily:"'Barlow',sans-serif",display:"flex",alignItems:"center",gap:6}}>
+          {analyzing?"⏳ Analisando...":"🧠 Analisar todos os leads"}
+        </button>
       </div>
 
+      {/* Smart Alerts */}
+      {alerts.length>0&&(
+        <div style={{marginBottom:24,display:"flex",flexDirection:"column",gap:8}}>
+          {alerts.slice(0,4).map((a,i)=>(
+            <div key={i} style={{padding:"10px 16px",borderRadius:10,
+              background:alertColors[a.type],border:`1px solid ${alertBorders[a.type]}`,
+              display:"flex",alignItems:"center",gap:10}}>
+              <span style={{fontSize:16}}>{a.icon}</span>
+              <span style={{fontSize:13,color:alertTextColors[a.type]}}>{a.msg}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* KPIs */}
       <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(200px,1fr))",gap:14,marginBottom:28}}>
         <KpiCard icon="🎬" label="Pipeline Total" value={fmt(totalPipeline)} sub={`${clients.length} clientes ativos`} gradient="linear-gradient(90deg,#00d4ff,#0066ff)"/>
         <KpiCard icon="🏆" label="Fechados" value={fmt(closedValue)} sub={`${closed.length} contratos`} gradient="linear-gradient(90deg,#ffb800,#ff6b35)"/>
@@ -203,7 +268,8 @@ function Dashboard({clients, interactions, tasks}) {
         <KpiCard icon="💬" label="Interações" value={interactions.length} sub="Total registrado" gradient="linear-gradient(90deg,#ff2d78,#ff6b35)"/>
       </div>
 
-      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20}}>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:20,marginBottom:20}}>
+        {/* Pipeline */}
         <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(0,212,255,0.15)",borderRadius:12,padding:22}}>
           <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,letterSpacing:1,color:"#00d4ff",marginBottom:18,textTransform:"uppercase"}}>Pipeline por Etapa</div>
           {stageData.map(d=>(
@@ -213,46 +279,81 @@ function Dashboard({clients, interactions, tasks}) {
                 <span style={{fontSize:12,color:"#7a9bb5"}}>{d.count} · {fmt(d.value)}</span>
               </div>
               <div style={{background:"rgba(255,255,255,0.06)",borderRadius:3,height:6,overflow:"hidden"}}>
-                <div style={{width:`${(d.value/maxVal)*100}%`,height:"100%",background:`linear-gradient(90deg,${STAGE_COLORS[d.stage]},${STAGE_COLORS[d.stage]}88)`,borderRadius:3,transition:"width 0.8s ease"}}/>
+                <div style={{width:`${(d.value/maxVal)*100}%`,height:"100%",background:`linear-gradient(90deg,${STAGE_COLORS[d.stage]},${STAGE_COLORS[d.stage]}88)`,borderRadius:3}}/>
               </div>
             </div>
           ))}
         </div>
 
+        {/* Recent interactions */}
         <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(0,212,255,0.15)",borderRadius:12,padding:22}}>
           <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,letterSpacing:1,color:"#00d4ff",marginBottom:18,textTransform:"uppercase"}}>Últimas Interações</div>
           {recent.map(i=>{
-            const client = clients.find(c=>c.id===i.clientId);
-            return (
+            const client=clients.find(c=>c.id===i.clientId);
+            return(
               <div key={i.id} style={{display:"flex",gap:12,marginBottom:14,paddingBottom:14,borderBottom:"1px solid rgba(0,212,255,0.08)"}}>
-                {client && <Avatar name={client.name} size={34}/>}
+                {client&&<Avatar name={client.name} size={34}/>}
                 <div style={{flex:1,minWidth:0}}>
                   <div style={{fontSize:13,fontWeight:600,color:"#e8f4f8",marginBottom:2}}>{client?.name}</div>
                   <div style={{fontSize:12,color:"#7a9bb5",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{i.note}</div>
                 </div>
-                <Badge label={i.type} color={i.type==="WhatsApp"?"#25D366":i.type==="Reunião"?"#ffb800":"#00d4ff"}/>
+                <Badge label={i.type} color="#00d4ff"/>
               </div>
             );
           })}
         </div>
       </div>
+
+      {/* Lead Scores — só aparece após análise */}
+      {topLeads.length>0&&(
+        <div style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(0,212,255,0.15)",borderRadius:12,padding:22}}>
+          <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:16,letterSpacing:1,color:"#00d4ff",marginBottom:16,textTransform:"uppercase"}}>🎯 Ranking de Leads — Score de Fechamento</div>
+          <div style={{display:"grid",gap:10}}>
+            {topLeads.map(c=>{
+              const s = c.score;
+              const tempColor = s.temp==="quente"?"#ff2d78":s.temp==="morno"?"#ffb800":"#7a9bb5";
+              const tempIcon = s.temp==="quente"?"🔥":s.temp==="morno"?"🌤":"❄️";
+              return(
+                <div key={c.id} style={{display:"flex",gap:14,alignItems:"center",padding:"10px 14px",borderRadius:10,background:"rgba(255,255,255,0.02)",border:"1px solid rgba(255,255,255,0.06)"}}>
+                  <Avatar name={c.name} size={36}/>
+                  <div style={{flex:1,minWidth:0}}>
+                    <div style={{fontSize:14,fontWeight:600,color:"#e8f4f8"}}>{c.name}</div>
+                    <div style={{fontSize:12,color:"#7a9bb5",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{s.summary}</div>
+                  </div>
+                  <span style={{fontSize:16}}>{tempIcon}</span>
+                  <div style={{textAlign:"right",minWidth:60}}>
+                    <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:24,color:tempColor,lineHeight:1}}>{s.score}%</div>
+                    <div style={{fontSize:10,color:"#7a9bb5"}}>chance</div>
+                  </div>
+                  {/* Score bar */}
+                  <div style={{width:80,background:"rgba(255,255,255,0.08)",borderRadius:4,height:6,overflow:"hidden"}}>
+                    <div style={{width:`${s.score}%`,height:"100%",background:tempColor,borderRadius:4}}/>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 
-// ══ LEAD PANEL — Painel do lead com IA Copiloto ════════════════════════════
+
+// ══ LEAD PANEL ════════════════════════════════════════════════════════════════
 
 function LeadPanel({client, clients, interactions, tasks, allTasks, setClients, setInteractions, setTasks, onClose, onUpdateClient}) {
-  const [tab, setTab] = useState("overview"); // overview | chat
-  const [chatHistory, setChatHistory] = useState([]);
-  const [chatInput, setChatInput] = useState("");
-  const [chatLoading, setChatLoading] = useState(false);
-  const [addingInteraction, setAddingInteraction] = useState(false);
-  const [iForm, setIForm] = useState({type:"WhatsApp",note:""});
-  const [addingTask, setAddingTask] = useState(false);
-  const [tForm, setTForm] = useState({title:"",dueDate:today(),priority:"Média"});
-  const [editStage, setEditStage] = useState(false);
+  const [tab, setTab] = React.useState("overview");
+  const [chatHistory, setChatHistory] = React.useState([]);
+  const [chatInput, setChatInput] = React.useState("");
+  const [chatLoading, setChatLoading] = React.useState(false);
+  const [addingInteraction, setAddingInteraction] = React.useState(false);
+  const [iForm, setIForm] = React.useState({type:"WhatsApp",note:""});
+  const [addingTask, setAddingTask] = React.useState(false);
+  const [tForm, setTForm] = React.useState({title:"",dueDate:today(),priority:"Média"});
+  const [editStage, setEditStage] = React.useState(false);
+  const [copiedIdx, setCopiedIdx] = React.useState(null);
 
   const typeIcon = {Ligação:"📞","E-mail":"✉️",Reunião:"🤝",WhatsApp:"💬",Visita:"🏢"};
   const prioColor = {Alta:"#ff2d78",Média:"#ffb800",Baixa:"#00d4ff"};
@@ -272,7 +373,6 @@ function LeadPanel({client, clients, interactions, tasks, allTasks, setClients, 
   const toggleTask = id => setTasks(p=>p.map(t=>t.id===id?{...t,done:!t.done}:t));
   const changeStage = stage => { onUpdateClient({...client,stage}); setEditStage(false); };
 
-  // ── AI Chat ───────────────────────────────────────────────────────────────
   const buildContext = () => [
     `Cliente: ${client.name}`,
     `Empresa: ${client.company||"—"}`,
@@ -289,10 +389,12 @@ function LeadPanel({client, clients, interactions, tasks, allTasks, setClients, 
   ].join("\n");
 
   const QUICK_ACTIONS = [
-    {label:"💡 Próximo passo", prompt:"Com base no histórico deste lead, qual é o melhor próximo passo que devo dar?"},
-    {label:"📱 Mensagem WPP", prompt:"Escreva uma mensagem de WhatsApp personalizada para este cliente, considerando o contexto do histórico. Tom profissional mas próximo."},
-    {label:"🎯 Chance de fechar", prompt:"Analise o histórico e me diga: qual a probabilidade de fechar negócio com este cliente? Quais são os sinais positivos e os riscos?"},
-    {label:"⚠️ Pontos de atenção", prompt:"Quais são os principais riscos ou objeções que posso encontrar com este cliente? Como devo me preparar?"},
+    {label:"💡 Próximo passo",    prompt:"Com base no histórico deste lead, qual é o melhor próximo passo? Seja direto e prático."},
+    {label:"📱 Mensagem WhatsApp", prompt:"Escreva uma mensagem de WhatsApp pronta para copiar e enviar. Considere o contexto. Tom profissional mas próximo. Inclua uma proposta de valor clara."},
+    {label:"🎯 Score de fechamento", prompt:"Dê: 1) % de chance de fechar (ex: 65%) 2) 3 sinais positivos 3) 2 riscos 4) O que fazer nas próximas 48h para aumentar as chances."},
+    {label:"⚠️ Objeções prováveis", prompt:"Quais as principais objeções deste cliente? Como responder a cada uma de forma convincente?"},
+    {label:"🌡️ Temperatura do lead", prompt:"Classifique como QUENTE 🔥, MORNO 🌤️ ou FRIO ❄️ e explique em 2-3 linhas. Depois diga o que fazer com base nessa temperatura."},
+    {label:"✍️ E-mail de proposta",  prompt:"Escreva um e-mail profissional de proposta comercial com base no histórico. Inclua objeto, corpo e assinatura VIVAI Studio."},
   ];
 
   const sendChat = async (msg) => {
@@ -301,25 +403,20 @@ function LeadPanel({client, clients, interactions, tasks, allTasks, setClients, 
     setChatHistory(p=>[...p,userMsg]);
     setChatInput("");
     setChatLoading(true);
-
-    const messages = [
-      ...chatHistory,
-      userMsg
-    ];
-
+    const messages = [...chatHistory, userMsg];
     try {
       const res = await fetch("/api/chat",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
         body:JSON.stringify({
           max_tokens:600,
-          system:`Você é o assistente de vendas da VIVAI Studio Audiovisual. 
+          system:`Você é o assistente de vendas da VIVAI Studio Audiovisual.
 Responda sempre em português brasileiro, de forma direta e prática.
 Você está ajudando o time da VIVAI a tomar decisões sobre o seguinte cliente:
 
 ${buildContext()}
 
-Seja objetivo. Máximo 3 parágrafos por resposta. Use bullets quando listar itens.`,
+Seja objetivo. Máximo 3 parágrafos. Use bullets quando listar itens.`,
           messages
         })
       });
@@ -332,31 +429,33 @@ Seja objetivo. Máximo 3 parágrafos por resposta. Use bullets quando listar ite
     setChatLoading(false);
   };
 
+  const copyMsg = (text, idx) => {
+    navigator.clipboard.writeText(text);
+    setCopiedIdx(idx);
+    setTimeout(()=>setCopiedIdx(null),2000);
+  };
+
   const inp2 = {background:"rgba(0,212,255,0.05)",border:"1px solid rgba(0,212,255,0.2)",borderRadius:8,color:"#e8f4f8",fontSize:13,padding:"8px 10px",outline:"none",fontFamily:"'Barlow',sans-serif",width:"100%",boxSizing:"border-box"};
 
   return (
     <div style={{position:"fixed",inset:0,zIndex:500,display:"flex"}}>
-      {/* Backdrop */}
       <div onClick={onClose} style={{flex:1,background:"rgba(13,31,45,0.7)",cursor:"pointer"}}/>
-
-      {/* Panel */}
-      <div style={{width:480,background:"#0d1f2d",borderLeft:"1px solid rgba(0,212,255,0.2)",display:"flex",flexDirection:"column",height:"100vh",overflowY:"auto"}}>
+      <div style={{width:480,background:"#0d1f2d",borderLeft:"1px solid rgba(0,212,255,0.2)",display:"flex",flexDirection:"column",height:"100vh"}}>
 
         {/* Header */}
-        <div style={{padding:"20px 20px 16px",borderBottom:"1px solid rgba(0,212,255,0.1)",display:"flex",gap:12,alignItems:"flex-start"}}>
+        <div style={{padding:"20px 20px 16px",borderBottom:"1px solid rgba(0,212,255,0.1)",display:"flex",gap:12,alignItems:"flex-start",flexShrink:0}}>
           <Avatar name={client.name} size={44}/>
           <div style={{flex:1,minWidth:0}}>
             <div style={{fontWeight:700,fontSize:16,color:"#e8f4f8"}}>{client.name}</div>
             <div style={{fontSize:12,color:"#7a9bb5"}}>{client.company}{client.email?` · ${client.email}`:""}</div>
             <div style={{display:"flex",gap:8,marginTop:6,flexWrap:"wrap",alignItems:"center"}}>
               {editStage ? (
-                <select autoFocus value={client.stage} onChange={e=>changeStage(e.target.value)}
-                  onBlur={()=>setEditStage(false)}
+                <select autoFocus value={client.stage} onChange={e=>changeStage(e.target.value)} onBlur={()=>setEditStage(false)}
                   style={{...inp2,width:"auto",padding:"3px 8px",fontSize:12}}>
                   {STAGES.map(s=><option key={s} value={s}>{s}</option>)}
                 </select>
               ) : (
-                <span onClick={()=>setEditStage(true)} style={{cursor:"pointer",title:"Clique para editar"}}>
+                <span onClick={()=>setEditStage(true)} style={{cursor:"pointer"}}>
                   <Badge label={client.stage} color={STAGE_COLORS[client.stage]}/>
                 </span>
               )}
@@ -367,7 +466,7 @@ Seja objetivo. Máximo 3 parágrafos por resposta. Use bullets quando listar ite
         </div>
 
         {/* Tabs */}
-        <div style={{display:"flex",borderBottom:"1px solid rgba(0,212,255,0.1)"}}>
+        <div style={{display:"flex",borderBottom:"1px solid rgba(0,212,255,0.1)",flexShrink:0}}>
           {[["overview","📋 Histórico"],["chat","🤖 IA Copiloto"]].map(([t,l])=>(
             <button key={t} onClick={()=>setTab(t)} style={{flex:1,padding:"12px",border:"none",cursor:"pointer",fontSize:13,fontWeight:600,fontFamily:"'Barlow',sans-serif",
               background:tab===t?"rgba(0,212,255,0.08)":"transparent",
@@ -381,7 +480,6 @@ Seja objetivo. Máximo 3 parágrafos por resposta. Use bullets quando listar ite
         {/* Tab: Overview */}
         {tab==="overview"&&(
           <div style={{flex:1,padding:"16px 20px",overflowY:"auto"}}>
-
             {/* Quick actions */}
             <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
               <button onClick={()=>window.open(`/quote?id=${client.id}`,'_blank')}
@@ -390,25 +488,26 @@ Seja objetivo. Máximo 3 parágrafos por resposta. Use bullets quando listar ite
               </button>
               <button onClick={()=>setAddingInteraction(true)}
                 style={{padding:"6px 14px",borderRadius:6,border:"1px solid rgba(0,212,255,0.3)",background:"rgba(0,212,255,0.08)",color:"#00d4ff",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"'Barlow',sans-serif"}}>
-                + Registrar interação
+                + Interação
               </button>
               <button onClick={()=>setAddingTask(true)}
                 style={{padding:"6px 14px",borderRadius:6,border:"1px solid rgba(0,212,255,0.2)",background:"transparent",color:"#7a9bb5",fontSize:12,cursor:"pointer",fontFamily:"'Barlow',sans-serif"}}>
                 + Tarefa
               </button>
+              <button onClick={()=>setTab("chat")}
+                style={{padding:"6px 14px",borderRadius:6,border:"1px solid rgba(255,45,120,0.3)",background:"rgba(255,45,120,0.06)",color:"#ff2d78",fontSize:12,cursor:"pointer",fontFamily:"'Barlow',sans-serif"}}>
+                🤖 Perguntar à IA
+              </button>
             </div>
 
-            {/* Add interaction inline */}
+            {/* Add interaction */}
             {addingInteraction&&(
               <div style={{marginBottom:16,padding:"12px",background:"rgba(0,212,255,0.05)",borderRadius:10,border:"1px solid rgba(0,212,255,0.2)"}}>
-                <div style={{display:"flex",gap:8,marginBottom:8}}>
-                  <select value={iForm.type} onChange={e=>setIForm(p=>({...p,type:e.target.value}))} style={{...inp2,width:"auto"}}>
-                    {["Ligação","E-mail","Reunião","WhatsApp","Visita"].map(t=><option key={t}>{t}</option>)}
-                  </select>
-                </div>
+                <select value={iForm.type} onChange={e=>setIForm(p=>({...p,type:e.target.value}))} style={{...inp2,marginBottom:8}}>
+                  {["Ligação","E-mail","Reunião","WhatsApp","Visita"].map(t=><option key={t}>{t}</option>)}
+                </select>
                 <textarea value={iForm.note} onChange={e=>setIForm(p=>({...p,note:e.target.value}))}
-                  placeholder="O que aconteceu nesta interação?" rows={2}
-                  style={{...inp2,resize:"vertical",marginBottom:8}}/>
+                  placeholder="O que aconteceu nesta interação?" rows={2} style={{...inp2,resize:"vertical",marginBottom:8}}/>
                 <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
                   <button onClick={()=>setAddingInteraction(false)} style={{padding:"5px 12px",borderRadius:6,border:"1px solid rgba(255,255,255,0.1)",background:"transparent",color:"#7a9bb5",fontSize:12,cursor:"pointer"}}>Cancelar</button>
                   <button onClick={saveInteraction} style={{padding:"5px 12px",borderRadius:6,border:"none",background:"linear-gradient(90deg,#00d4ff,#0066ff)",color:"#fff",fontSize:12,cursor:"pointer",fontWeight:600}}>Salvar</button>
@@ -416,7 +515,7 @@ Seja objetivo. Máximo 3 parágrafos por resposta. Use bullets quando listar ite
               </div>
             )}
 
-            {/* Add task inline */}
+            {/* Add task */}
             {addingTask&&(
               <div style={{marginBottom:16,padding:"12px",background:"rgba(0,212,255,0.05)",borderRadius:10,border:"1px solid rgba(0,212,255,0.2)"}}>
                 <input value={tForm.title} onChange={e=>setTForm(p=>({...p,title:e.target.value}))}
@@ -434,7 +533,7 @@ Seja objetivo. Máximo 3 parágrafos por resposta. Use bullets quando listar ite
               </div>
             )}
 
-            {/* Interactions timeline */}
+            {/* Interactions */}
             {interactions.length>0&&(
               <div style={{marginBottom:20}}>
                 <div style={{fontSize:11,color:"#7a9bb5",marginBottom:10,textTransform:"uppercase",letterSpacing:1,fontFamily:"'Barlow Condensed',sans-serif"}}>Interações ({interactions.length})</div>
@@ -459,10 +558,7 @@ Seja objetivo. Máximo 3 parágrafos por resposta. Use bullets quando listar ite
               <div>
                 <div style={{fontSize:11,color:"#7a9bb5",marginBottom:10,textTransform:"uppercase",letterSpacing:1,fontFamily:"'Barlow Condensed',sans-serif"}}>Tarefas ({tasks.length})</div>
                 {tasks.map(t=>(
-                  <div key={t.id} style={{display:"flex",gap:10,marginBottom:8,alignItems:"center",
-                    padding:"8px 10px",borderRadius:8,
-                    background:t.done?"transparent":"rgba(255,255,255,0.02)",
-                    border:`1px solid ${t.dueDate<today()&&!t.done?"rgba(255,45,120,0.2)":"rgba(255,255,255,0.06)"}`}}>
+                  <div key={t.id} style={{display:"flex",gap:10,marginBottom:8,alignItems:"center",padding:"8px 10px",borderRadius:8,background:"rgba(255,255,255,0.02)",border:`1px solid ${t.dueDate<today()&&!t.done?"rgba(255,45,120,0.2)":"rgba(255,255,255,0.06)"}`}}>
                     <button onClick={()=>toggleTask(t.id)} style={{width:18,height:18,borderRadius:4,border:`2px solid ${t.done?"#00d4ff":"rgba(0,212,255,0.3)"}`,background:t.done?"rgba(0,212,255,0.2)":"transparent",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#00d4ff"}}>
                       {t.done&&"✓"}
                     </button>
@@ -487,16 +583,16 @@ Seja objetivo. Máximo 3 parágrafos por resposta. Use bullets quando listar ite
 
         {/* Tab: AI Chat */}
         {tab==="chat"&&(
-          <div style={{flex:1,display:"flex",flexDirection:"column",padding:"16px 20px"}}>
+          <div style={{flex:1,display:"flex",flexDirection:"column",padding:"16px 20px",overflow:"hidden"}}>
 
-            {/* Quick action buttons */}
+            {/* Quick actions */}
             {chatHistory.length===0&&(
-              <div style={{marginBottom:16}}>
+              <div style={{marginBottom:14,flexShrink:0}}>
                 <div style={{fontSize:11,color:"#7a9bb5",marginBottom:8,textTransform:"uppercase",letterSpacing:1,fontFamily:"'Barlow Condensed',sans-serif"}}>Ações rápidas</div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7}}>
                   {QUICK_ACTIONS.map(a=>(
                     <button key={a.label} onClick={()=>sendChat(a.prompt)}
-                      style={{padding:"10px 12px",borderRadius:8,border:"1px solid rgba(0,212,255,0.2)",background:"rgba(0,212,255,0.05)",color:"#b0ccd8",fontSize:12,cursor:"pointer",textAlign:"left",fontFamily:"'Barlow',sans-serif",lineHeight:1.4}}>
+                      style={{padding:"9px 8px",borderRadius:8,border:"1px solid rgba(0,212,255,0.2)",background:"rgba(0,212,255,0.05)",color:"#b0ccd8",fontSize:11,cursor:"pointer",textAlign:"left",fontFamily:"'Barlow',sans-serif",lineHeight:1.4}}>
                       {a.label}
                     </button>
                   ))}
@@ -504,46 +600,54 @@ Seja objetivo. Máximo 3 parágrafos por resposta. Use bullets quando listar ite
               </div>
             )}
 
-            {/* Chat messages */}
-            <div style={{flex:1,overflowY:"auto",marginBottom:12,display:"flex",flexDirection:"column",gap:10}}>
+            {/* Messages */}
+            <div style={{flex:1,overflowY:"auto",marginBottom:10,display:"flex",flexDirection:"column",gap:10}}>
               {chatHistory.map((m,i)=>(
                 <div key={i} style={{display:"flex",gap:8,alignItems:"flex-start",flexDirection:m.role==="user"?"row-reverse":"row"}}>
-                  <div style={{width:28,height:28,borderRadius:"50%",flexShrink:0,
-                    background:m.role==="user"?"rgba(0,212,255,0.2)":"rgba(255,45,120,0.2)",
-                    display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>
+                  <div style={{width:26,height:26,borderRadius:"50%",flexShrink:0,background:m.role==="user"?"rgba(0,212,255,0.2)":"rgba(255,45,120,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13}}>
                     {m.role==="user"?"👤":"🤖"}
                   </div>
-                  <div style={{maxWidth:"80%",padding:"10px 12px",borderRadius:10,fontSize:13,lineHeight:1.6,
-                    background:m.role==="user"?"rgba(0,212,255,0.1)":"rgba(255,255,255,0.04)",
-                    color:"#e8f4f8",border:`1px solid ${m.role==="user"?"rgba(0,212,255,0.2)":"rgba(255,255,255,0.08)"}`}}>
-                    {m.content}
+                  <div style={{maxWidth:"80%"}}>
+                    <div style={{padding:"10px 12px",borderRadius:10,fontSize:13,lineHeight:1.6,
+                      background:m.role==="user"?"rgba(0,212,255,0.1)":"rgba(255,255,255,0.04)",
+                      color:"#e8f4f8",border:`1px solid ${m.role==="user"?"rgba(0,212,255,0.2)":"rgba(255,255,255,0.08)"}`}}>
+                      {m.content}
+                    </div>
+                    {m.role==="assistant"&&(
+                      <button onClick={()=>copyMsg(m.content,i)}
+                        style={{marginTop:3,background:"none",border:"none",color:copiedIdx===i?"#00d4ff":"#7a9bb5",fontSize:11,cursor:"pointer",padding:"2px 6px"}}>
+                        {copiedIdx===i?"✓ copiado":"📋 copiar"}
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
               {chatLoading&&(
                 <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                  <div style={{width:28,height:28,borderRadius:"50%",background:"rgba(255,45,120,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:14}}>🤖</div>
+                  <div style={{width:26,height:26,borderRadius:"50%",background:"rgba(255,45,120,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13}}>🤖</div>
                   <div style={{padding:"10px 14px",borderRadius:10,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",color:"#7a9bb5",fontSize:13}}>Analisando...</div>
                 </div>
               )}
             </div>
 
             {/* Input */}
-            <div style={{display:"flex",gap:8}}>
-              <input value={chatInput} onChange={e=>setChatInput(e.target.value)}
-                onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendChat(chatInput);}}}
-                placeholder={`Pergunte sobre ${client.name}...`}
-                style={{...inp2,flex:1}}/>
-              <button onClick={()=>sendChat(chatInput)} disabled={chatLoading||!chatInput.trim()}
-                style={{padding:"8px 16px",borderRadius:8,border:"none",background:"linear-gradient(90deg,#00d4ff,#0066ff)",color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer",opacity:chatLoading?0.5:1}}>
-                →
-              </button>
+            <div style={{flexShrink:0}}>
+              <div style={{display:"flex",gap:8}}>
+                <input value={chatInput} onChange={e=>setChatInput(e.target.value)}
+                  onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendChat(chatInput);}}}
+                  placeholder={`Pergunte sobre ${client.name}...`}
+                  style={{...inp2,flex:1}}/>
+                <button onClick={()=>sendChat(chatInput)} disabled={chatLoading||!chatInput.trim()}
+                  style={{padding:"8px 16px",borderRadius:8,border:"none",background:"linear-gradient(90deg,#00d4ff,#0066ff)",color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer",opacity:chatLoading?0.5:1}}>
+                  →
+                </button>
+              </div>
+              {chatHistory.length>0&&(
+                <button onClick={()=>setChatHistory([])} style={{marginTop:6,background:"none",border:"none",color:"#7a9bb5",fontSize:11,cursor:"pointer",width:"100%",textAlign:"center"}}>
+                  Limpar conversa
+                </button>
+              )}
             </div>
-            {chatHistory.length>0&&(
-              <button onClick={()=>setChatHistory([])} style={{marginTop:8,background:"none",border:"none",color:"#7a9bb5",fontSize:11,cursor:"pointer",textAlign:"center"}}>
-                Limpar conversa
-              </button>
-            )}
           </div>
         )}
       </div>
@@ -552,7 +656,7 @@ Seja objetivo. Máximo 3 parágrafos por resposta. Use bullets quando listar ite
 }
 
 
-function Clients({clients, setClients, interactions, setInteractions, tasks, setTasks}) {
+function Clients({clients, setClients, interactions, setInteractions, tasks, setTasks, leadScores={}}) {
   const [search, setSearch] = useState("");
   const [modal, setModal] = useState(null);
   const [form, setForm] = useState({});
@@ -586,7 +690,12 @@ function Clients({clients, setClients, interactions, setInteractions, tasks, set
           >
             <Avatar name={c.name} size={42}/>
             <div style={{flex:1,minWidth:0}}>
-              <div style={{fontWeight:600,fontSize:15,color:"#e8f4f8"}}>{c.name}</div>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <div style={{fontWeight:600,fontSize:15,color:"#e8f4f8"}}>{c.name}</div>
+                {leadScores[c.id]&&<span title={`Score: ${leadScores[c.id].score}%`} style={{fontSize:14,cursor:"default"}}>
+                  {leadScores[c.id].temp==="quente"?"🔥":leadScores[c.id].temp==="morno"?"🌤":"❄️"}
+                </span>}
+              </div>
               <div style={{fontSize:12,color:"#7a9bb5"}}>{c.company}{c.email?` · ${c.email}`:""}</div>
             </div>
             <div style={{display:"flex",gap:8,alignItems:"center",flexWrap:"wrap",justifyContent:"flex-end"}}>
@@ -886,14 +995,30 @@ function App() {
   const [clients, setClients] = useState([]);
   const [interactions, setInteractions] = useState([]);
   const [tasks, setTasks] = useState([]);
+  const [leadScores, setLeadScores] = useState({}); // {clientId: {temp, score, summary}}
+  const [analyzing, setAnalyzing] = useState(false);
 
   useEffect(()=>{
     fetch("/api/data").then(r=>r.json()).then(d=>{
       if(d.clients) setClients(d.clients);
       if(d.interactions) setInteractions(d.interactions);
       if(d.tasks) setTasks(d.tasks);
+      if(d.leadScores) setLeadScores(d.leadScores);
     }).catch(()=>{});
   },[]);
+
+  const analyzeLeads = async () => {
+    setAnalyzing(true);
+    try {
+      const res = await fetch("/api/analyze-leads",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({clients,interactions,tasks})});
+      const data = await res.json();
+      if(data.scores) {
+        setLeadScores(data.scores);
+        fetch("/api/data",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({leadScores:data.scores})}).catch(()=>{});
+      }
+    } catch(e){ console.error(e); }
+    setAnalyzing(false);
+  };
 
   const persist = (key, data) => fetch("/api/data",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({[key]:data})}).catch(()=>{});
   const setC = v => { const d=typeof v==="function"?v(clients):v; setClients(d); persist("clients",d); };
@@ -967,8 +1092,8 @@ function App() {
 
       {/* Main */}
       <main style={{marginLeft:240,flex:1,padding:"36px 40px",minHeight:"100vh",background:"radial-gradient(ellipse at 20% 50%, rgba(0,100,255,0.04) 0%, transparent 60%), radial-gradient(ellipse at 80% 20%, rgba(255,45,120,0.04) 0%, transparent 60%)"}}>
-        {view==="dashboard"    && <Dashboard clients={clients} interactions={interactions} tasks={tasks}/>}
-        {view==="clients"      && <Clients clients={clients} setClients={setC} interactions={interactions} setInteractions={setI} tasks={tasks} setTasks={setT}/>}
+        {view==="dashboard"    && <Dashboard clients={clients} interactions={interactions} tasks={tasks} leadScores={leadScores} analyzing={analyzing} onAnalyze={analyzeLeads}/>}
+        {view==="clients"      && <Clients clients={clients} setClients={setC} interactions={interactions} setInteractions={setI} tasks={tasks} setTasks={setT} leadScores={leadScores}/>}
         {view==="pipeline"     && <Pipeline clients={clients} setClients={setC}/>}
         {view==="interactions" && <Interactions interactions={interactions} setInteractions={setI} clients={clients}/>}
         {view==="tasks"        && <Tasks tasks={tasks} setTasks={setT} clients={clients}/>}
