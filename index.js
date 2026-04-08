@@ -31,6 +31,10 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "dashboard.html"));
 });
 
+app.get("/quote", (req, res) => {
+  res.sendFile(path.join(__dirname, "quote.html"));
+});
+
 // API: leitura dos dados
 app.get("/api/data", (req, res) => {
   try {
