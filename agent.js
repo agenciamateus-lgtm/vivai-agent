@@ -204,6 +204,15 @@ const CRM_TOOLS = [
     description: "Retorna resumo completo do CRM.",
     input_schema: { type: "object", properties: {} },
   },
+  {
+    name: "analisar_lead",
+    description: "Analisa um lead específico com todas suas interações e tarefas para dar recomendações de ação.",
+    input_schema: {
+      type: "object",
+      properties: { clientName: { type: "string", description: "Nome do cliente" } },
+      required: ["clientName"],
+    },
+  },
 ];
 
 // ── Execução das ferramentas ──────────────────────────────────────────────────
@@ -243,6 +252,26 @@ function executeTool(name, input) {
       if (!t) return `❌ Tarefa ${input.taskId} não encontrada.`;
       return `✅ Tarefa *"${t.title}"* concluída!`;
     }
+    case "analisar_lead": {
+      const { clientName } = input;
+      const clients = crm.listClients(clientName);
+      const client = clients[0];
+      if (!client) return `❌ Cliente "${clientName}" não encontrado.`;
+      const interactions = crm.listInteractions(client.id);
+      const tasks = crm.listTasks(false).filter(t => t.clientId === client.id);
+      const ctx = [
+        `Cliente: ${client.name} | ${client.company}`,
+        `Etapa: ${client.stage} | Valor: R$ ${(client.value||0).toLocaleString("pt-BR")}`,
+        `Interações: ${interactions.slice(0,3).map(i=>`[${i.type}] ${i.note}`).join(" | ")}`,
+        `Tarefas: ${tasks.map(t=>t.title).join(", ")||"nenhuma"}`,
+      ].join("
+");
+      return `📊 Contexto do lead:
+${ctx}
+
+[Análise em andamento pela IA...]`;
+    }
+
     case "resumo_dashboard": {
       const s = crm.getDashboardSummary();
       const fmt = v => `R$ ${v.toLocaleString("pt-BR")}`;
