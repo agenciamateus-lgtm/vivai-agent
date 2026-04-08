@@ -165,6 +165,73 @@ app.post("/api/chat", async (req, res) => {
   }
 });
 
+
+// ── Análise de leads com IA ───────────────────────────────────────────────────
+app.post("/api/analyze-leads", async (req, res) => {
+  try {
+    const { clients, interactions, tasks } = req.body;
+    const Anthropic = require("@anthropic-ai/sdk");
+    const ai = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+    // Build context for all active clients
+    const active = (clients || []).filter(c => c.stage !== "Fechado").slice(0, 15);
+    const clientsContext = active.map(c => {
+      const ints = (interactions || []).filter(i => i.clientId === c.id).slice(0, 3);
+      const tks  = (tasks || []).filter(t => t.clientId === c.id && !t.done);
+      return {
+        id: c.id, name: c.name, company: c.company,
+        stage: c.stage, value: c.value,
+        interactions: ints.map(i => `${i.date} [${i.type}]: ${i.note}`),
+        pendingTasks: tks.map(t => t.title),
+      };
+    });
+
+    const response = await ai.messages.create({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 2000,
+      messages: [{
+        role: "user",
+        content: `Você é um analista de CRM da VIVAI Studio Audiovisual.
+Analise os seguintes leads e retorne APENAS um JSON válido (sem markdown):
+
+{
+  "scores": {
+    "<id numérico>": {
+      "score": <0-100>,
+      "temp": "<quente|morno|frio>",
+      "summary": "<frase curta de 8-12 palavras sobre o estado do lead>"
+    }
+  }
+}
+
+Critérios:
+- quente: interesse claro, contato recente, em negociação/proposta, score >= 65
+- morno: interesse mas travado, sem contato há 1-2 semanas, score 35-64
+- frio: sem movimento, contato antigo, sem interesse claro, score < 35
+
+Leads para analisar:
+${JSON.stringify(clientsContext, null, 2)}`
+      }]
+    });
+
+    const raw = response.content.find(b => b.type === "text")?.text || "{}";
+    const clean = raw.replace(/\`\`\`json|\`\`\`/g, "").trim();
+    const data = JSON.parse(clean);
+
+    // Ensure all IDs are numbers
+    const scores = {};
+    Object.entries(data.scores || {}).forEach(([k, v]) => {
+      scores[Number(k)] = v;
+    });
+
+    console.log(`🧠 Leads analisados: ${Object.keys(scores).length}`);
+    res.json({ scores });
+  } catch (err) {
+    console.error("❌ /api/analyze-leads:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Start ─────────────────────────────────────────────────────────────────────
 app.listen(port, () => {
   console.log(`\n🌿 VIVAI Agent rodando na porta ${port}`);
