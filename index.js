@@ -115,6 +115,32 @@ app.post("/test", async (req, res) => {
   }
 });
 
+
+// ── Gerador de PDF de proposta ────────────────────────────────────────────────
+const { execSync } = require("child_process");
+const os = require("os");
+
+app.post("/api/quote/pdf", async (req, res) => {
+  try {
+    const data = req.body;
+    const tmpOut = path.join(os.tmpdir(), `proposta_${Date.now()}.pdf`);
+    const logoPath = path.join(__dirname, "logo.png");
+    const pyScript = path.join(__dirname, "generate_pdf.py");
+    const jsonStr = JSON.stringify(data).replace(/'/g, "\'");
+    const logoArg = require("fs").existsSync(logoPath) ? ` '${logoPath}'` : "";
+    execSync(`python3 '${pyScript}' '${jsonStr}' '${tmpOut}'${logoArg}`, { timeout: 30000 });
+    const pdfBuffer = require("fs").readFileSync(tmpOut);
+    require("fs").unlinkSync(tmpOut);
+    const clientName = (data.client || "proposta").replace(/[^a-zA-Z0-9]/g, "_");
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `attachment; filename="Proposta_VIVAI_${clientName}.pdf"`);
+    res.send(pdfBuffer);
+  } catch (err) {
+    console.error("Erro ao gerar PDF:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ── Start ─────────────────────────────────────────────────────────────────────
 app.listen(port, () => {
   console.log(`\n🌿 VIVAI Agent rodando na porta ${port}`);
