@@ -260,16 +260,12 @@ function executeTool(name, input) {
       const interactions = crm.listInteractions(client.id);
       const tasks = crm.listTasks(false).filter(t => t.clientId === client.id);
       const ctx = [
-        `Cliente: ${client.name} | ${client.company}`,
-        `Etapa: ${client.stage} | Valor: R$ ${(client.value||0).toLocaleString("pt-BR")}`,
-        `Interações: ${interactions.slice(0,3).map(i=>`[${i.type}] ${i.note}`).join(" | ")}`,
-        `Tarefas: ${tasks.map(t=>t.title).join(", ")||"nenhuma"}`,
-      ].join("
-");
-      return `📊 Contexto do lead:
-${ctx}
-
-[Análise em andamento pela IA...]`;
+        "Cliente: " + client.name + " | " + client.company,
+        "Etapa: " + client.stage + " | Valor: R$ " + (client.value||0).toLocaleString("pt-BR"),
+        "Interações: " + interactions.slice(0,3).map(i=>"["+i.type+"] "+i.note).join(" | "),
+        "Tarefas: " + (tasks.map(t=>t.title).join(", ")||"nenhuma"),
+      ].join("\n");
+      return "📊 Contexto do lead:\n" + ctx + "\n\n[Análise pela IA em andamento...]";
     }
 
     case "resumo_dashboard": {
