@@ -753,16 +753,7 @@ function QuoteView() {
 
   // ── RENDER ─────────────────────────────────────────────────────────────────
   return (
-    <>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow:wght@300;400;500;600;700&family=Barlow+Condensed:wght@400;600;700&display=swap');
-        * { box-sizing: border-box; }
-        body { margin:0; background:#0d1f2d; color:#e8f4f8; font-family:'Barlow',sans-serif; }
-        input::placeholder, textarea::placeholder { color: rgba(122,155,181,0.5); }
-        input[type=number]::-webkit-inner-spin-button { opacity: 0.4; }
-      `}</style>
-
-      <div style={{minHeight:"100vh", background:"#0d1f2d", padding:"32px 24px"}}>
+    <div style={{padding:0}}>
 
         {/* Header */}
         <div style={{marginBottom:28}}>
