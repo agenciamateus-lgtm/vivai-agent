@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>VIVAI Studio CRM</title>
+  <title>GESTOR VIVAI</title>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -343,9 +343,25 @@ function Dashboard({clients, interactions, tasks, leadScores, analyzing, onAnaly
 
 // ══ LEAD PANEL ════════════════════════════════════════════════════════════════
 
+// Simple markdown renderer for AI responses
+function renderMarkdown(text) {
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/^### (.*$)/gm, '<div style="font-size:13px;font-weight:700;color:#00d4ff;margin:10px 0 4px">$1</div>')
+    .replace(/^## (.*$)/gm,  '<div style="font-size:14px;font-weight:700;color:#e8f4f8;margin:12px 0 4px">$1</div>')
+    .replace(/^# (.*$)/gm,   '<div style="font-size:15px;font-weight:700;color:#00d4ff;margin:12px 0 6px">$1</div>')
+    .replace(/^• (.*$)/gm,   '<div style="padding:2px 0 2px 14px;border-left:2px solid rgba(0,212,255,0.3);margin:3px 0;color:#b0ccd8">$1</div>')
+    .replace(/^- (.*$)/gm,   '<div style="padding:2px 0 2px 14px;border-left:2px solid rgba(0,212,255,0.3);margin:3px 0;color:#b0ccd8">$1</div>')
+    .replace(/^\d+\. (.*$)/gm,'<div style="padding:2px 0 2px 14px;margin:3px 0;color:#b0ccd8">$1</div>')
+    .replace(/\n\n/g, '<div style="height:8px"></div>')
+    .replace(/\n/g, '<br/>');
+}
+
 function LeadPanel({client, clients, interactions, tasks, allTasks, setClients, setInteractions, setTasks, onClose, onUpdateClient}) {
   const [tab, setTab] = React.useState("overview");
-  const [chatHistory, setChatHistory] = React.useState([]);
+  const [chatHistory, setChatHistory] = React.useState(() => {
+    try { return JSON.parse(localStorage.getItem("chat_"+client.id)||"[]"); } catch { return []; }
+  });
   const [chatInput, setChatInput] = React.useState("");
   const [chatLoading, setChatLoading] = React.useState(false);
   const [addingInteraction, setAddingInteraction] = React.useState(false);
@@ -353,9 +369,17 @@ function LeadPanel({client, clients, interactions, tasks, allTasks, setClients, 
   const [addingTask, setAddingTask] = React.useState(false);
   const [tForm, setTForm] = React.useState({title:"",dueDate:today(),priority:"Média"});
   const [editStage, setEditStage] = React.useState(false);
+  const [editingClient, setEditingClient] = React.useState(false);
+  const [editForm, setEditForm] = React.useState({...client});
   const [copiedIdx, setCopiedIdx] = React.useState(null);
+  const chatEndRef = React.useRef(null);
 
-  const typeIcon = {Ligação:"📞","E-mail":"✉️",Reunião:"🤝",WhatsApp:"💬",Visita:"🏢"};
+  React.useEffect(()=>{
+    try { localStorage.setItem("chat_"+client.id, JSON.stringify(chatHistory)); } catch {}
+    chatEndRef.current?.scrollIntoView({behavior:"smooth"});
+  },[chatHistory]);
+
+  const typeIcon = {Ligação:"📞","E-mail":"✉️",Reunião:"🤝",WhatsApp:"💬",Visita:"🏢",Orçamento:"💰","IA Copiloto":"🤖"};
   const prioColor = {Alta:"#ff2d78",Média:"#ffb800",Baixa:"#00d4ff"};
 
   const saveInteraction = () => {
@@ -372,59 +396,57 @@ function LeadPanel({client, clients, interactions, tasks, allTasks, setClients, 
   };
   const toggleTask = id => setTasks(p=>p.map(t=>t.id===id?{...t,done:!t.done}:t));
   const changeStage = stage => { onUpdateClient({...client,stage}); setEditStage(false); };
+  const saveClientEdit = () => {
+    const updated = {...editForm, value:Number(editForm.value)||0, tags:typeof editForm.tags==="string"?editForm.tags.split(",").map(t=>t.trim()).filter(Boolean):editForm.tags||[]};
+    onUpdateClient(updated);
+    setEditingClient(false);
+  };
 
   const buildContext = () => [
-    `Cliente: ${client.name}`,
-    `Empresa: ${client.company||"—"}`,
-    `Serviço de interesse: ${client.servico||client.projeto||"—"}`,
-    `Etapa no pipeline: ${client.stage}`,
-    `Valor estimado: R$ ${(client.value||0).toLocaleString("pt-BR")}`,
-    `Origem: ${client.origem||"—"}`,
-    "",
-    "Histórico de interações:",
+    `Cliente: ${client.name}`, `Empresa: ${client.company||"—"}`,
+    `Serviço: ${client.servico||client.projeto||"—"}`,
+    `Etapa: ${client.stage}`, `Valor: R$ ${(client.value||0).toLocaleString("pt-BR")}`,
+    `Origem: ${client.origem||"—"}`, `Telefone: ${client.phone||"—"}`,
+    "","Histórico de interações:",
     ...interactions.map(i=>`[${i.date}] ${i.type}: ${i.note}`),
-    "",
-    "Tarefas:",
-    ...tasks.map(t=>`[${t.done?"✓":"pendente"}] ${t.title} — vence ${t.dueDate}`),
+    "","Tarefas:", ...tasks.map(t=>`[${t.done?"✓":"pendente"}] ${t.title} — ${t.dueDate}`),
   ].join("\n");
 
   const QUICK_ACTIONS = [
-    {label:"💡 Próximo passo",    prompt:"Com base no histórico deste lead, qual é o melhor próximo passo? Seja direto e prático."},
-    {label:"📱 Mensagem WhatsApp", prompt:"Escreva uma mensagem de WhatsApp pronta para copiar e enviar. Considere o contexto. Tom profissional mas próximo. Inclua uma proposta de valor clara."},
-    {label:"🎯 Score de fechamento", prompt:"Dê: 1) % de chance de fechar (ex: 65%) 2) 3 sinais positivos 3) 2 riscos 4) O que fazer nas próximas 48h para aumentar as chances."},
-    {label:"⚠️ Objeções prováveis", prompt:"Quais as principais objeções deste cliente? Como responder a cada uma de forma convincente?"},
-    {label:"🌡️ Temperatura do lead", prompt:"Classifique como QUENTE 🔥, MORNO 🌤️ ou FRIO ❄️ e explique em 2-3 linhas. Depois diga o que fazer com base nessa temperatura."},
-    {label:"✍️ E-mail de proposta",  prompt:"Escreva um e-mail profissional de proposta comercial com base no histórico. Inclua objeto, corpo e assinatura VIVAI Studio."},
+    {label:"💡 Próximo passo",     prompt:"Com base no histórico deste lead, qual é o melhor próximo passo? Seja direto e prático. Use títulos e bullets."},
+    {label:"📱 Mensagem WhatsApp",  prompt:"Escreva uma mensagem de WhatsApp pronta para copiar. Tom profissional mas próximo. Inclua proposta de valor clara."},
+    {label:"🎯 Score de fechamento",prompt:"Dê: 1) % de chance de fechar 2) 3 sinais positivos 3) 2 riscos 4) O que fazer nas próximas 48h. Use emojis e bullets."},
+    {label:"⚠️ Objeções",           prompt:"Quais as principais objeções deste cliente? Como responder a cada uma? Use títulos por objeção."},
+    {label:"🌡️ Temperatura",       prompt:"Classifique como QUENTE 🔥, MORNO 🌤️ ou FRIO ❄️. Explique em tópicos. Diga o que fazer baseado na temperatura."},
+    {label:"✍️ E-mail proposta",    prompt:"Escreva um e-mail profissional de proposta. Inclua: Assunto, Corpo, Assinatura VIVAI Studio. Use formatação clara."},
   ];
 
   const sendChat = async (msg) => {
-    if(!msg.trim()) return;
+    if(!msg.trim()||chatLoading) return;
     const userMsg = {role:"user", content:msg};
-    setChatHistory(p=>[...p,userMsg]);
+    const newHistory = [...chatHistory, userMsg];
+    setChatHistory(newHistory);
     setChatInput("");
     setChatLoading(true);
-    const messages = [...chatHistory, userMsg];
     try {
-      const res = await fetch("/api/chat",{
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({
-          max_tokens:600,
+      const res = await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({max_tokens:700,
           system:`Você é o assistente de vendas da VIVAI Studio Audiovisual.
-Responda sempre em português brasileiro, de forma direta e prática.
-Você está ajudando o time da VIVAI a tomar decisões sobre o seguinte cliente:
-
-${buildContext()}
-
-Seja objetivo. Máximo 3 parágrafos. Use bullets quando listar itens.`,
-          messages
-        })
-      });
+Responda SEMPRE em português brasileiro, de forma direta e bem formatada.
+Use **negrito**, ## títulos, bullets (•), emojis e estrutura clara nas respostas.
+Contexto do cliente:\n${buildContext()}`,
+          messages:newHistory})});
       const data = await res.json();
-      const reply = data.content?.find(b=>b.type==="text")?.text || "Erro ao obter resposta.";
-      setChatHistory(p=>[...p,{role:"assistant",content:reply}]);
+      const reply = data.content?.find(b=>b.type==="text")?.text||"Erro ao obter resposta.";
+      const assistantMsg = {role:"assistant",content:reply};
+      setChatHistory(p=>[...p,assistantMsg]);
+      // Save AI interaction to CRM
+      const aiInt = {id:Date.now(),clientId:client.id,clientName:client.name,
+        type:"IA Copiloto",note:`Pergunta: ${msg}\n\nResposta: ${reply.slice(0,300)}${reply.length>300?"...":""}`,
+        author:"IA",date:today()};
+      setInteractions(p=>[aiInt,...p]);
     } catch(e) {
-      setChatHistory(p=>[...p,{role:"assistant",content:"Erro de conexão. Tente novamente."}]);
+      setChatHistory(p=>[...p,{role:"assistant",content:"❌ Erro de conexão. Tente novamente."}]);
     }
     setChatLoading(false);
   };
@@ -437,77 +459,119 @@ Seja objetivo. Máximo 3 parágrafos. Use bullets quando listar itens.`,
 
   const inp2 = {background:"rgba(0,212,255,0.05)",border:"1px solid rgba(0,212,255,0.2)",borderRadius:8,color:"#e8f4f8",fontSize:13,padding:"8px 10px",outline:"none",fontFamily:"'Barlow',sans-serif",width:"100%",boxSizing:"border-box"};
 
+  // ── Context summary ─────────────────────────────────────────────────────────
+  const lastInt = [...interactions].sort((a,b)=>b.date.localeCompare(a.date))[0];
+  const daysSinceContact = lastInt ? Math.floor((new Date(today())-new Date(lastInt.date))/(86400000)) : null;
+  const pendingTasks = tasks.filter(t=>!t.done);
+
   return (
     <div style={{position:"fixed",inset:0,zIndex:500,display:"flex"}}>
       <div onClick={onClose} style={{flex:1,background:"rgba(13,31,45,0.7)",cursor:"pointer"}}/>
-      <div style={{width:480,background:"#0d1f2d",borderLeft:"1px solid rgba(0,212,255,0.2)",display:"flex",flexDirection:"column",height:"100vh"}}>
+      <div style={{width:520,background:"#0d1f2d",borderLeft:"1px solid rgba(0,212,255,0.2)",display:"flex",flexDirection:"column",height:"100vh"}}>
 
         {/* Header */}
-        <div style={{padding:"20px 20px 16px",borderBottom:"1px solid rgba(0,212,255,0.1)",display:"flex",gap:12,alignItems:"flex-start",flexShrink:0}}>
-          <Avatar name={client.name} size={44}/>
-          <div style={{flex:1,minWidth:0}}>
-            <div style={{fontWeight:700,fontSize:16,color:"#e8f4f8"}}>{client.name}</div>
-            <div style={{fontSize:12,color:"#7a9bb5"}}>{client.company}{client.email?` · ${client.email}`:""}</div>
-            <div style={{display:"flex",gap:8,marginTop:6,flexWrap:"wrap",alignItems:"center"}}>
-              {editStage ? (
-                <select autoFocus value={client.stage} onChange={e=>changeStage(e.target.value)} onBlur={()=>setEditStage(false)}
-                  style={{...inp2,width:"auto",padding:"3px 8px",fontSize:12}}>
-                  {STAGES.map(s=><option key={s} value={s}>{s}</option>)}
-                </select>
-              ) : (
-                <span onClick={()=>setEditStage(true)} style={{cursor:"pointer"}}>
-                  <Badge label={client.stage} color={STAGE_COLORS[client.stage]}/>
-                </span>
-              )}
-              {client.value>0&&<span style={{fontSize:12,color:"#ffb800",fontWeight:600}}>R$ {client.value.toLocaleString("pt-BR")}</span>}
+        <div style={{padding:"18px 20px 14px",borderBottom:"1px solid rgba(0,212,255,0.1)",flexShrink:0}}>
+          <div style={{display:"flex",gap:12,alignItems:"flex-start"}}>
+            <Avatar name={client.name} size={44}/>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{fontWeight:700,fontSize:16,color:"#e8f4f8"}}>{client.name}</div>
+              <div style={{fontSize:12,color:"#7a9bb5"}}>{client.company}{client.phone?` · ${client.phone}`:""}</div>
+              <div style={{display:"flex",gap:8,marginTop:6,flexWrap:"wrap",alignItems:"center"}}>
+                {editStage
+                  ? <select autoFocus value={client.stage} onChange={e=>changeStage(e.target.value)} onBlur={()=>setEditStage(false)} style={{...inp2,width:"auto",padding:"3px 8px",fontSize:12}}>
+                      {STAGES.map(s=><option key={s} value={s}>{s}</option>)}
+                    </select>
+                  : <span onClick={()=>setEditStage(true)} title="Clique para mudar etapa" style={{cursor:"pointer"}}><Badge label={client.stage} color={STAGE_COLORS[client.stage]}/></span>
+                }
+                {client.value>0&&<span style={{fontSize:12,color:"#ffb800",fontWeight:600}}>R$ {client.value.toLocaleString("pt-BR")}</span>}
+                {client.email&&<span style={{fontSize:11,color:"#7a9bb5"}}>{client.email}</span>}
+              </div>
+            </div>
+            <div style={{display:"flex",gap:6",flexShrink:0}}>
+              <button onClick={()=>setEditingClient(!editingClient)} title="Editar dados"
+                style={{background:"rgba(0,212,255,0.08)",border:"1px solid rgba(0,212,255,0.2)",borderRadius:6,padding:"5px 8px",color:"#00d4ff",cursor:"pointer",fontSize:12}}>✏️</button>
+              <button onClick={onClose} style={{background:"none",border:"none",color:"#7a9bb5",cursor:"pointer",fontSize:22,lineHeight:1}}>×</button>
             </div>
           </div>
-          <button onClick={onClose} style={{background:"none",border:"none",color:"#7a9bb5",cursor:"pointer",fontSize:22,lineHeight:1,flexShrink:0}}>×</button>
+
+          {/* Inline edit form */}
+          {editingClient&&(
+            <div style={{marginTop:12,padding:"12px",background:"rgba(0,212,255,0.04)",borderRadius:10,border:"1px solid rgba(0,212,255,0.15)"}}>
+              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+                {[["name","Nome"],["company","Empresa"],["phone","Telefone"],["email","E-mail"],["value","Valor (R$)"],["origem","Origem"],["servico","Serviço de interesse"],["projeto","Projeto"]].map(([f,l])=>(
+                  <div key={f}>
+                    <div style={{fontSize:10,color:"#7a9bb5",marginBottom:3,textTransform:"uppercase",letterSpacing:0.5}}>{l}</div>
+                    <input value={editForm[f]||""} onChange={e=>setEditForm(p=>({...p,[f]:e.target.value}))} style={{...inp2,padding:"6px 8px",fontSize:12}}/>
+                  </div>
+                ))}
+              </div>
+              <div style={{marginBottom:8}}>
+                <div style={{fontSize:10,color:"#7a9bb5",marginBottom:3,textTransform:"uppercase",letterSpacing:0.5}}>Tags (vírgula)</div>
+                <input value={Array.isArray(editForm.tags)?editForm.tags.join(", "):editForm.tags||""} onChange={e=>setEditForm(p=>({...p,tags:e.target.value}))} style={{...inp2,padding:"6px 8px",fontSize:12}} placeholder="VIP, Recorrente..."/>
+              </div>
+              <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+                <button onClick={()=>setEditingClient(false)} style={{padding:"5px 12px",borderRadius:6,border:"1px solid rgba(255,255,255,0.1)",background:"transparent",color:"#7a9bb5",fontSize:12,cursor:"pointer"}}>Cancelar</button>
+                <button onClick={saveClientEdit} style={{padding:"5px 14px",borderRadius:6,border:"none",background:"linear-gradient(90deg,#00d4ff,#0066ff)",color:"#fff",fontSize:12,cursor:"pointer",fontWeight:600}}>Salvar</button>
+              </div>
+            </div>
+          )}
+
+          {/* Context summary strip */}
+          <div style={{display:"flex",gap:10,marginTop:10,flexWrap:"wrap"}}>
+            {daysSinceContact!==null&&(
+              <div style={{fontSize:11,padding:"3px 10px",borderRadius:20,background:daysSinceContact>14?"rgba(255,45,120,0.15)":"rgba(0,212,255,0.08)",color:daysSinceContact>14?"#ff2d78":"#7a9bb5",border:`1px solid ${daysSinceContact>14?"rgba(255,45,120,0.3)":"rgba(0,212,255,0.15)"}`}}>
+                {daysSinceContact===0?"Contato hoje":daysSinceContact===1?"Contato ontem":`Último contato: ${daysSinceContact}d atrás`}
+              </div>
+            )}
+            {pendingTasks.length>0&&<div style={{fontSize:11,padding:"3px 10px",borderRadius:20,background:"rgba(255,184,0,0.1)",color:"#ffb800",border:"1px solid rgba(255,184,0,0.3)"}}>{pendingTasks.length} tarefa{pendingTasks.length>1?"s":""} pendente{pendingTasks.length>1?"s":""}</div>}
+            {interactions.length>0&&<div style={{fontSize:11,padding:"3px 10px",borderRadius:20,background:"rgba(255,255,255,0.04)",color:"#7a9bb5",border:"1px solid rgba(255,255,255,0.08)"}}>{interactions.length} interaç{interactions.length>1?"ões":"ão"}</div>}
+            {client.origem&&<div style={{fontSize:11,padding:"3px 10px",borderRadius:20,background:"rgba(255,45,120,0.08)",color:"#ff6b8a",border:"1px solid rgba(255,45,120,0.2)"}}>{client.origem}</div>}
+            {client.tags?.map(t=><div key={t} style={{fontSize:11,padding:"3px 10px",borderRadius:20,background:"rgba(255,184,0,0.08)",color:"rgba(255,184,0,0.9)",border:"1px solid rgba(255,184,0,0.2)"}}>{t}</div>)}
+          </div>
+        </div>
+
+        {/* Quick actions row */}
+        <div style={{padding:"10px 16px",borderBottom:"1px solid rgba(0,212,255,0.08)",display:"flex",gap:7,flexShrink:0,flexWrap:"wrap"}}>
+          <button onClick={()=>window.open(`/quote?id=${client.id}`,'_blank')}
+            style={{padding:"5px 12px",borderRadius:6,border:"1px solid rgba(255,184,0,0.35)",background:"rgba(255,184,0,0.08)",color:"#ffb800",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"'Barlow',sans-serif"}}>
+            💰 Orçamento
+          </button>
+          <button onClick={()=>setAddingInteraction(true)}
+            style={{padding:"5px 12px",borderRadius:6,border:"1px solid rgba(0,212,255,0.3)",background:"rgba(0,212,255,0.08)",color:"#00d4ff",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"'Barlow',sans-serif"}}>
+            + Interação
+          </button>
+          <button onClick={()=>setAddingTask(true)}
+            style={{padding:"5px 12px",borderRadius:6,border:"1px solid rgba(0,212,255,0.2)",background:"transparent",color:"#7a9bb5",fontSize:11,cursor:"pointer",fontFamily:"'Barlow',sans-serif"}}>
+            + Tarefa
+          </button>
+          <button onClick={()=>setTab("chat")}
+            style={{padding:"5px 12px",borderRadius:6,border:"1px solid rgba(255,45,120,0.3)",background:"rgba(255,45,120,0.06)",color:"#ff2d78",fontSize:11,cursor:"pointer",fontFamily:"'Barlow',sans-serif"}}>
+            🤖 IA
+          </button>
         </div>
 
         {/* Tabs */}
         <div style={{display:"flex",borderBottom:"1px solid rgba(0,212,255,0.1)",flexShrink:0}}>
           {[["overview","📋 Histórico"],["chat","🤖 IA Copiloto"]].map(([t,l])=>(
-            <button key={t} onClick={()=>setTab(t)} style={{flex:1,padding:"12px",border:"none",cursor:"pointer",fontSize:13,fontWeight:600,fontFamily:"'Barlow',sans-serif",
-              background:tab===t?"rgba(0,212,255,0.08)":"transparent",
-              color:tab===t?"#00d4ff":"#7a9bb5",
+            <button key={t} onClick={()=>setTab(t)} style={{flex:1,padding:"11px",border:"none",cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:"'Barlow',sans-serif",
+              background:tab===t?"rgba(0,212,255,0.08)":"transparent",color:tab===t?"#00d4ff":"#7a9bb5",
               borderBottom:tab===t?"2px solid #00d4ff":"2px solid transparent"}}>
               {l}
             </button>
           ))}
         </div>
 
-        {/* Tab: Overview */}
+        {/* Tab Overview */}
         {tab==="overview"&&(
-          <div style={{flex:1,padding:"16px 20px",overflowY:"auto"}}>
-            {/* Quick actions */}
-            <div style={{display:"flex",gap:8,marginBottom:16,flexWrap:"wrap"}}>
-              <button onClick={()=>window.open(`/quote?id=${client.id}`,'_blank')}
-                style={{padding:"6px 14px",borderRadius:6,border:"1px solid rgba(255,184,0,0.35)",background:"rgba(255,184,0,0.08)",color:"#ffb800",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"'Barlow',sans-serif"}}>
-                💰 Gerar orçamento
-              </button>
-              <button onClick={()=>setAddingInteraction(true)}
-                style={{padding:"6px 14px",borderRadius:6,border:"1px solid rgba(0,212,255,0.3)",background:"rgba(0,212,255,0.08)",color:"#00d4ff",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"'Barlow',sans-serif"}}>
-                + Interação
-              </button>
-              <button onClick={()=>setAddingTask(true)}
-                style={{padding:"6px 14px",borderRadius:6,border:"1px solid rgba(0,212,255,0.2)",background:"transparent",color:"#7a9bb5",fontSize:12,cursor:"pointer",fontFamily:"'Barlow',sans-serif"}}>
-                + Tarefa
-              </button>
-              <button onClick={()=>setTab("chat")}
-                style={{padding:"6px 14px",borderRadius:6,border:"1px solid rgba(255,45,120,0.3)",background:"rgba(255,45,120,0.06)",color:"#ff2d78",fontSize:12,cursor:"pointer",fontFamily:"'Barlow',sans-serif"}}>
-                🤖 Perguntar à IA
-              </button>
-            </div>
+          <div style={{flex:1,padding:"14px 18px",overflowY:"auto"}}>
 
             {/* Add interaction */}
             {addingInteraction&&(
-              <div style={{marginBottom:16,padding:"12px",background:"rgba(0,212,255,0.05)",borderRadius:10,border:"1px solid rgba(0,212,255,0.2)"}}>
+              <div style={{marginBottom:14,padding:"12px",background:"rgba(0,212,255,0.05)",borderRadius:10,border:"1px solid rgba(0,212,255,0.2)"}}>
                 <select value={iForm.type} onChange={e=>setIForm(p=>({...p,type:e.target.value}))} style={{...inp2,marginBottom:8}}>
                   {["Ligação","E-mail","Reunião","WhatsApp","Visita"].map(t=><option key={t}>{t}</option>)}
                 </select>
-                <textarea value={iForm.note} onChange={e=>setIForm(p=>({...p,note:e.target.value}))}
-                  placeholder="O que aconteceu nesta interação?" rows={2} style={{...inp2,resize:"vertical",marginBottom:8}}/>
+                <textarea value={iForm.note} onChange={e=>setIForm(p=>({...p,note:e.target.value}))} placeholder="O que aconteceu?" rows={2} style={{...inp2,resize:"vertical",marginBottom:8}}/>
                 <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
                   <button onClick={()=>setAddingInteraction(false)} style={{padding:"5px 12px",borderRadius:6,border:"1px solid rgba(255,255,255,0.1)",background:"transparent",color:"#7a9bb5",fontSize:12,cursor:"pointer"}}>Cancelar</button>
                   <button onClick={saveInteraction} style={{padding:"5px 12px",borderRadius:6,border:"none",background:"linear-gradient(90deg,#00d4ff,#0066ff)",color:"#fff",fontSize:12,cursor:"pointer",fontWeight:600}}>Salvar</button>
@@ -517,9 +581,8 @@ Seja objetivo. Máximo 3 parágrafos. Use bullets quando listar itens.`,
 
             {/* Add task */}
             {addingTask&&(
-              <div style={{marginBottom:16,padding:"12px",background:"rgba(0,212,255,0.05)",borderRadius:10,border:"1px solid rgba(0,212,255,0.2)"}}>
-                <input value={tForm.title} onChange={e=>setTForm(p=>({...p,title:e.target.value}))}
-                  placeholder="Título da tarefa..." style={{...inp2,marginBottom:8}}/>
+              <div style={{marginBottom:14,padding:"12px",background:"rgba(0,212,255,0.05)",borderRadius:10,border:"1px solid rgba(0,212,255,0.2)"}}>
+                <input value={tForm.title} onChange={e=>setTForm(p=>({...p,title:e.target.value}))} placeholder="Título da tarefa..." style={{...inp2,marginBottom:8}}/>
                 <div style={{display:"flex",gap:8,marginBottom:8}}>
                   <input type="date" value={tForm.dueDate} onChange={e=>setTForm(p=>({...p,dueDate:e.target.value}))} style={{...inp2,flex:1}}/>
                   <select value={tForm.priority} onChange={e=>setTForm(p=>({...p,priority:e.target.value}))} style={{...inp2,width:"auto"}}>
@@ -533,20 +596,20 @@ Seja objetivo. Máximo 3 parágrafos. Use bullets quando listar itens.`,
               </div>
             )}
 
-            {/* Interactions */}
+            {/* Interactions timeline */}
             {interactions.length>0&&(
-              <div style={{marginBottom:20}}>
-                <div style={{fontSize:11,color:"#7a9bb5",marginBottom:10,textTransform:"uppercase",letterSpacing:1,fontFamily:"'Barlow Condensed',sans-serif"}}>Interações ({interactions.length})</div>
+              <div style={{marginBottom:18}}>
+                <div style={{fontSize:10,color:"#7a9bb5",marginBottom:10,textTransform:"uppercase",letterSpacing:1,fontFamily:"'Barlow Condensed',sans-serif"}}>Interações ({interactions.length})</div>
                 {[...interactions].sort((a,b)=>b.date.localeCompare(a.date)).map(i=>(
                   <div key={i.id} style={{display:"flex",gap:10,marginBottom:12,paddingBottom:12,borderBottom:"1px solid rgba(0,212,255,0.06)"}}>
-                    <span style={{fontSize:18,flexShrink:0}}>{typeIcon[i.type]||"💬"}</span>
+                    <span style={{fontSize:16,flexShrink:0,marginTop:2}}>{typeIcon[i.type]||"💬"}</span>
                     <div style={{flex:1}}>
                       <div style={{display:"flex",gap:8,marginBottom:3,alignItems:"center"}}>
                         <span style={{fontSize:11,color:"#7a9bb5"}}>{i.date}</span>
                         <Badge label={i.type} color="#00d4ff"/>
                         <span style={{fontSize:11,color:"#7a9bb5"}}>· {i.author}</span>
                       </div>
-                      <div style={{fontSize:13,color:"#b0ccd8",lineHeight:1.5}}>{i.note}</div>
+                      <div style={{fontSize:13,color:"#b0ccd8",lineHeight:1.5,whiteSpace:"pre-line"}}>{i.note}</div>
                     </div>
                   </div>
                 ))}
@@ -556,15 +619,13 @@ Seja objetivo. Máximo 3 parágrafos. Use bullets quando listar itens.`,
             {/* Tasks */}
             {tasks.length>0&&(
               <div>
-                <div style={{fontSize:11,color:"#7a9bb5",marginBottom:10,textTransform:"uppercase",letterSpacing:1,fontFamily:"'Barlow Condensed',sans-serif"}}>Tarefas ({tasks.length})</div>
+                <div style={{fontSize:10,color:"#7a9bb5",marginBottom:10,textTransform:"uppercase",letterSpacing:1,fontFamily:"'Barlow Condensed',sans-serif"}}>Tarefas ({tasks.length})</div>
                 {tasks.map(t=>(
                   <div key={t.id} style={{display:"flex",gap:10,marginBottom:8,alignItems:"center",padding:"8px 10px",borderRadius:8,background:"rgba(255,255,255,0.02)",border:`1px solid ${t.dueDate<today()&&!t.done?"rgba(255,45,120,0.2)":"rgba(255,255,255,0.06)"}`}}>
-                    <button onClick={()=>toggleTask(t.id)} style={{width:18,height:18,borderRadius:4,border:`2px solid ${t.done?"#00d4ff":"rgba(0,212,255,0.3)"}`,background:t.done?"rgba(0,212,255,0.2)":"transparent",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#00d4ff"}}>
-                      {t.done&&"✓"}
-                    </button>
+                    <button onClick={()=>toggleTask(t.id)} style={{width:18,height:18,borderRadius:4,border:`2px solid ${t.done?"#00d4ff":"rgba(0,212,255,0.3)"}`,background:t.done?"rgba(0,212,255,0.2)":"transparent",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#00d4ff"}}>{t.done&&"✓"}</button>
                     <div style={{flex:1}}>
                       <div style={{fontSize:13,color:"#e8f4f8",textDecoration:t.done?"line-through":"none"}}>{t.title}</div>
-                      <div style={{fontSize:11,color:"#7a9bb5"}}>{t.dueDate} · {t.priority}</div>
+                      <div style={{fontSize:11,color:"#7a9bb5"}}>{t.dueDate} · {t.priority}{t.notes&&" · 📌 tem notas"}</div>
                     </div>
                     <Badge label={t.priority} color={prioColor[t.priority]}/>
                   </div>
@@ -574,25 +635,25 @@ Seja objetivo. Máximo 3 parágrafos. Use bullets quando listar itens.`,
 
             {interactions.length===0&&tasks.length===0&&(
               <div style={{textAlign:"center",padding:"32px 0",color:"#7a9bb5",fontSize:13}}>
-                Nenhuma interação ainda.<br/>
-                <span style={{color:"#00d4ff",cursor:"pointer"}} onClick={()=>setTab("chat")}>Pergunte à IA o que fazer com este lead →</span>
+                Sem histórico ainda.<br/>
+                <span style={{color:"#00d4ff",cursor:"pointer"}} onClick={()=>setTab("chat")}>Pergunte à IA o que fazer →</span>
               </div>
             )}
           </div>
         )}
 
-        {/* Tab: AI Chat */}
+        {/* Tab AI Chat */}
         {tab==="chat"&&(
-          <div style={{flex:1,display:"flex",flexDirection:"column",padding:"16px 20px",overflow:"hidden"}}>
+          <div style={{flex:1,display:"flex",flexDirection:"column",overflow:"hidden"}}>
 
             {/* Quick actions */}
             {chatHistory.length===0&&(
-              <div style={{marginBottom:14,flexShrink:0}}>
-                <div style={{fontSize:11,color:"#7a9bb5",marginBottom:8,textTransform:"uppercase",letterSpacing:1,fontFamily:"'Barlow Condensed',sans-serif"}}>Ações rápidas</div>
-                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7}}>
+              <div style={{padding:"12px 16px",borderBottom:"1px solid rgba(0,212,255,0.08)",flexShrink:0}}>
+                <div style={{fontSize:10,color:"#7a9bb5",marginBottom:8,textTransform:"uppercase",letterSpacing:1,fontFamily:"'Barlow Condensed',sans-serif"}}>Ações rápidas</div>
+                <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6}}>
                   {QUICK_ACTIONS.map(a=>(
                     <button key={a.label} onClick={()=>sendChat(a.prompt)}
-                      style={{padding:"9px 8px",borderRadius:8,border:"1px solid rgba(0,212,255,0.2)",background:"rgba(0,212,255,0.05)",color:"#b0ccd8",fontSize:11,cursor:"pointer",textAlign:"left",fontFamily:"'Barlow',sans-serif",lineHeight:1.4}}>
+                      style={{padding:"8px 8px",borderRadius:8,border:"1px solid rgba(0,212,255,0.2)",background:"rgba(0,212,255,0.04)",color:"#b0ccd8",fontSize:11,cursor:"pointer",textAlign:"left",fontFamily:"'Barlow',sans-serif",lineHeight:1.4}}>
                       {a.label}
                     </button>
                   ))}
@@ -601,17 +662,18 @@ Seja objetivo. Máximo 3 parágrafos. Use bullets quando listar itens.`,
             )}
 
             {/* Messages */}
-            <div style={{flex:1,overflowY:"auto",marginBottom:10,display:"flex",flexDirection:"column",gap:10}}>
+            <div style={{flex:1,overflowY:"auto",padding:"14px 16px",display:"flex",flexDirection:"column",gap:10}}>
               {chatHistory.map((m,i)=>(
                 <div key={i} style={{display:"flex",gap:8,alignItems:"flex-start",flexDirection:m.role==="user"?"row-reverse":"row"}}>
-                  <div style={{width:26,height:26,borderRadius:"50%",flexShrink:0,background:m.role==="user"?"rgba(0,212,255,0.2)":"rgba(255,45,120,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13}}>
+                  <div style={{width:26,height:26,borderRadius:"50%",flexShrink:0,background:m.role==="user"?"rgba(0,212,255,0.2)":"rgba(255,45,120,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12}}>
                     {m.role==="user"?"👤":"🤖"}
                   </div>
-                  <div style={{maxWidth:"80%"}}>
+                  <div style={{maxWidth:"85%"}}>
                     <div style={{padding:"10px 12px",borderRadius:10,fontSize:13,lineHeight:1.6,
                       background:m.role==="user"?"rgba(0,212,255,0.1)":"rgba(255,255,255,0.04)",
-                      color:"#e8f4f8",border:`1px solid ${m.role==="user"?"rgba(0,212,255,0.2)":"rgba(255,255,255,0.08)"}`}}>
-                      {m.content}
+                      color:"#e8f4f8",border:`1px solid ${m.role==="user"?"rgba(0,212,255,0.2)":"rgba(255,255,255,0.08)"}`}}
+                      dangerouslySetInnerHTML={m.role==="assistant"?{__html:renderMarkdown(m.content)}:undefined}>
+                      {m.role==="user"?m.content:null}
                     </div>
                     {m.role==="assistant"&&(
                       <button onClick={()=>copyMsg(m.content,i)}
@@ -624,26 +686,25 @@ Seja objetivo. Máximo 3 parágrafos. Use bullets quando listar itens.`,
               ))}
               {chatLoading&&(
                 <div style={{display:"flex",gap:8,alignItems:"center"}}>
-                  <div style={{width:26,height:26,borderRadius:"50%",background:"rgba(255,45,120,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13}}>🤖</div>
+                  <div style={{width:26,height:26,borderRadius:"50%",background:"rgba(255,45,120,0.2)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12}}>🤖</div>
                   <div style={{padding:"10px 14px",borderRadius:10,background:"rgba(255,255,255,0.04)",border:"1px solid rgba(255,255,255,0.08)",color:"#7a9bb5",fontSize:13}}>Analisando...</div>
                 </div>
               )}
+              <div ref={chatEndRef}/>
             </div>
 
             {/* Input */}
-            <div style={{flexShrink:0}}>
+            <div style={{padding:"10px 16px",borderTop:"1px solid rgba(0,212,255,0.08)",flexShrink:0}}>
               <div style={{display:"flex",gap:8}}>
                 <input value={chatInput} onChange={e=>setChatInput(e.target.value)}
                   onKeyDown={e=>{if(e.key==="Enter"&&!e.shiftKey){e.preventDefault();sendChat(chatInput);}}}
-                  placeholder={`Pergunte sobre ${client.name}...`}
-                  style={{...inp2,flex:1}}/>
+                  placeholder={`Pergunte sobre ${client.name}...`} style={{...inp2,flex:1}}/>
                 <button onClick={()=>sendChat(chatInput)} disabled={chatLoading||!chatInput.trim()}
-                  style={{padding:"8px 16px",borderRadius:8,border:"none",background:"linear-gradient(90deg,#00d4ff,#0066ff)",color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer",opacity:chatLoading?0.5:1}}>
-                  →
-                </button>
+                  style={{padding:"8px 16px",borderRadius:8,border:"none",background:"linear-gradient(90deg,#00d4ff,#0066ff)",color:"#fff",fontSize:13,fontWeight:600,cursor:"pointer",opacity:chatLoading?0.5:1}}>→</button>
               </div>
               {chatHistory.length>0&&(
-                <button onClick={()=>setChatHistory([])} style={{marginTop:6,background:"none",border:"none",color:"#7a9bb5",fontSize:11,cursor:"pointer",width:"100%",textAlign:"center"}}>
+                <button onClick={()=>{setChatHistory([]);try{localStorage.removeItem("chat_"+client.id);}catch{}}}
+                  style={{marginTop:6,background:"none",border:"none",color:"#7a9bb5",fontSize:11,cursor:"pointer",width:"100%",textAlign:"center"}}>
                   Limpar conversa
                 </button>
               )}
@@ -746,16 +807,17 @@ function Clients({clients, setClients, interactions, setInteractions, tasks, set
 }
 
 
-function Pipeline({clients, setClients}) {
+function Pipeline({clients, setClients, interactions, setInteractions, tasks, setTasks}) {
   const [dragging, setDragging] = useState(null);
-  const [over, setOver] = useState(null);
+  const [over, setOver]         = useState(null);
+  const [panel, setPanel]       = useState(null);
   const drop = stage => { if(dragging) setClients(p=>p.map(c=>c.id===dragging?{...c,stage}:c)); setDragging(null); setOver(null); };
 
   return (
     <div className="fade-in">
-      <div style={{marginBottom:28}}>
-        <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:38,letterSpacing:2,marginBottom:6}}><GradText>Pipeline</GradText></div>
-        <div style={{color:"#7a9bb5",fontSize:14}}>Arraste os cards entre as etapas.</div>
+      <div style={{marginBottom:24}}>
+        <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:38,letterSpacing:2,marginBottom:4}}><GradText>Pipeline</GradText></div>
+        <div style={{color:"#7a9bb5",fontSize:13}}>Arraste para mover · Clique no card para abrir</div>
       </div>
       <div style={{display:"flex",gap:12,overflowX:"auto",paddingBottom:16}}>
         {STAGES.map(stage=>{
@@ -764,43 +826,73 @@ function Pipeline({clients, setClients}) {
           const isOver = over===stage;
           return (
             <div key={stage} onDragOver={e=>{e.preventDefault();setOver(stage);}} onDrop={()=>drop(stage)} onDragLeave={()=>setOver(null)}
-              style={{minWidth:210,flex:"0 0 210px",background:isOver?"rgba(0,212,255,0.06)":"rgba(255,255,255,0.02)",borderRadius:12,padding:14,border:`1px solid ${isOver?STAGE_COLORS[stage]+"66":"rgba(0,212,255,0.12)"}`,transition:"all 0.2s"}}>
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:10}}>
-                <div style={{width:8,height:8,borderRadius:"50%",background:STAGE_COLORS[stage],boxShadow:`0 0 8px ${STAGE_COLORS[stage]}`}}/>
+              style={{minWidth:210,flex:"0 0 210px",background:isOver?"rgba(0,212,255,0.06)":"rgba(255,255,255,0.02)",border:`1px solid ${isOver?"rgba(0,212,255,0.4)":"rgba(0,212,255,0.1)"}`,borderRadius:12,padding:"14px 12px",transition:"all 0.2s"}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
+                <div style={{width:8,height:8,borderRadius:"50%",background:STAGE_COLORS[stage]}}/>
                 <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,fontSize:12,color:STAGE_COLORS[stage],letterSpacing:1,textTransform:"uppercase"}}>{stage}</span>
                 <span style={{marginLeft:"auto",fontSize:11,color:"#7a9bb5"}}>{cols.length}</span>
               </div>
               <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:12,color:"#7a9bb5",marginBottom:12}}>{fmt(total)}</div>
               <div style={{display:"flex",flexDirection:"column",gap:8}}>
                 {cols.map(c=>(
-                  <div key={c.id} draggable onDragStart={()=>setDragging(c.id)} onDragEnd={()=>{setDragging(null);setOver(null);}}
-                    style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(0,212,255,0.15)",borderRadius:10,padding:"12px 14px",cursor:"grab",opacity:dragging===c.id?0.4:1,transition:"opacity 0.2s"}}>
+                  <div key={c.id} draggable onClick={()=>setPanel(c)}
+                    onDragStart={e=>{e.stopPropagation();setDragging(c.id);}}
+                    onDragEnd={()=>{setDragging(null);setOver(null);}}
+                    style={{background:"rgba(255,255,255,0.04)",border:"1px solid rgba(0,212,255,0.15)",borderRadius:10,padding:"10px 12px",cursor:"pointer",transition:"border-color 0.2s"}}
+                    onMouseEnter={e=>e.currentTarget.style.borderColor="rgba(0,212,255,0.4)"}
+                    onMouseLeave={e=>e.currentTarget.style.borderColor="rgba(0,212,255,0.15)"}>
                     <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
                       <Avatar name={c.name} size={26}/>
-                      <span style={{fontWeight:600,fontSize:13,color:"#e8f4f8"}}>{c.name}</span>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontWeight:600,fontSize:13,color:"#e8f4f8",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{c.name}</div>
+                        <div style={{fontSize:11,color:"#7a9bb5",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{c.company}</div>
+                      </div>
                     </div>
-                    <div style={{fontSize:11,color:"#7a9bb5",marginBottom:6}}>{c.company}</div>
-                    <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:14,fontWeight:700,color:"#ffb800"}}>{fmt(c.value)}</div>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                      <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontWeight:700,fontSize:14,color:"#ffb800"}}>{fmt(c.value)}</span>
+                      {tasks.filter(t=>t.clientId===c.id&&!t.done).length>0&&(
+                        <span style={{fontSize:10,color:"#00d4ff",background:"rgba(0,212,255,0.1)",padding:"2px 6px",borderRadius:10}}>
+                          ✓ {tasks.filter(t=>t.clientId===c.id&&!t.done).length}
+                        </span>
+                      )}
+                    </div>
+                    {c.servico&&<div style={{fontSize:11,color:"#7a9bb5",marginTop:4,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{c.servico}</div>}
                   </div>
                 ))}
+                {cols.length===0&&<div style={{textAlign:"center",padding:"20px 0",color:"rgba(0,212,255,0.2)",fontSize:12}}>Vazio</div>}
               </div>
             </div>
           );
         })}
       </div>
+      {panel&&<LeadPanel
+        client={panel} clients={clients}
+        interactions={interactions.filter(i=>i.clientId===panel.id)}
+        tasks={tasks.filter(t=>t.clientId===panel.id)}
+        allTasks={tasks} setClients={setClients}
+        setInteractions={setInteractions} setTasks={setTasks}
+        onClose={()=>setPanel(null)}
+        onUpdateClient={updated=>{setClients(p=>p.map(c=>c.id===updated.id?updated:c));setPanel(updated);}}
+      />}
     </div>
   );
 }
 
+
 function Interactions({interactions, setInteractions, clients}) {
-  const [modal, setModal] = useState(false);
-  const [form, setForm] = useState({clientId:"",type:"WhatsApp",date:today(),note:"",author:""});
-  const [filter, setFilter] = useState("all");
+  const [modal, setModal]       = useState(false);
+  const [form, setForm]         = useState({clientId:"",type:"WhatsApp",date:today(),note:"",author:""});
+  const [filter, setFilter]     = useState("all");
+  const [expanded, setExpanded] = useState(null);
+  const [editing, setEditing]   = useState(null);
+  const [editNote, setEditNote] = useState("");
   const filtered = filter==="all"?interactions:interactions.filter(i=>i.type===filter);
-  const sorted = [...filtered].sort((a,b)=>b.date.localeCompare(a.date));
-  const save = () => { setInteractions(p=>[...p,{...form,id:Date.now(),clientId:Number(form.clientId)}]); setModal(false); setForm({clientId:"",type:"WhatsApp",date:today(),note:"",author:""}); };
-  const typeIcon = {Ligação:"📞","E-mail":"✉️",Reunião:"🎬",WhatsApp:"💬",Visita:"🏢"};
-  const typeColor = {Ligação:"#00d4ff","E-mail":"#ffb800",Reunião:"#ff6b35",WhatsApp:"#25D366",Visita:"#ff2d78"};
+  const sorted   = [...filtered].sort((a,b)=>b.date.localeCompare(a.date));
+  const save     = () => { setInteractions(p=>[...p,{...form,id:Date.now(),clientId:Number(form.clientId)}]); setModal(false); };
+  const del      = id => { if(confirm("Remover interação?")) setInteractions(p=>p.filter(i=>i.id!==id)); };
+  const saveEdit = id => { setInteractions(p=>p.map(i=>i.id===id?{...i,note:editNote}:i)); setEditing(null); };
+  const typeIcon  = {Ligação:"📞","E-mail":"✉️",Reunião:"🤝",WhatsApp:"💬",Visita:"🏢",Orçamento:"💰","IA Copiloto":"🤖"};
+  const typeColor = {Ligação:"#00d4ff","E-mail":"#ffb800",Reunião:"#ff6b35",WhatsApp:"#25D366",Visita:"#ff2d78",Orçamento:"#ffb800","IA Copiloto":"#ff2d78"};
 
   return (
     <div className="fade-in">
@@ -810,34 +902,67 @@ function Interactions({interactions, setInteractions, clients}) {
       </div>
       <div style={{display:"flex",gap:8,marginBottom:20,flexWrap:"wrap"}}>
         {["all",...INTERACTION_TYPES].map(t=>(
-          <button key={t} onClick={()=>setFilter(t)} style={{padding:"6px 14px",borderRadius:6,border:"1px solid",cursor:"pointer",fontSize:12,fontWeight:600,letterSpacing:0.5,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",
-            borderColor:filter===t?"#00d4ff":"rgba(0,212,255,0.2)",
-            background:filter===t?"rgba(0,212,255,0.15)":"transparent",
-            color:filter===t?"#00d4ff":"#7a9bb5"
-          }}>{t==="all"?"Todos":t}</button>
+          <button key={t} onClick={()=>setFilter(t)} style={{padding:"6px 14px",borderRadius:6,border:"1px solid",cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:0.5,
+            borderColor:filter===t?"#00d4ff":"rgba(0,212,255,0.2)",background:filter===t?"rgba(0,212,255,0.15)":"transparent",color:filter===t?"#00d4ff":"#7a9bb5"}}>
+            {t==="all"?"Todos":t}
+          </button>
         ))}
       </div>
-      <div style={{display:"grid",gap:10}}>
+      <div style={{display:"grid",gap:8}}>
         {sorted.map(i=>{
           const client = clients.find(c=>c.id===i.clientId);
+          const isExp  = expanded===i.id;
           return (
-            <div key={i.id} style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(0,212,255,0.1)",borderRadius:12,padding:"16px 20px",display:"flex",gap:14}}>
-              <div style={{fontSize:24,flexShrink:0}}>{typeIcon[i.type]||"💬"}</div>
-              <div style={{flex:1}}>
-                <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:6,flexWrap:"wrap"}}>
-                  <span style={{fontWeight:600,fontSize:14,color:"#e8f4f8"}}>{client?.name||"Cliente"}</span>
-                  <Badge label={i.type} color={typeColor[i.type]||"#00d4ff"}/>
-                  <span style={{fontSize:11,color:"#7a9bb5"}}>{i.date} · {i.author}</span>
+            <div key={i.id} style={{background:"rgba(255,255,255,0.03)",border:`1px solid ${isExp?"rgba(0,212,255,0.3)":"rgba(0,212,255,0.1)"}`,borderRadius:12,overflow:"hidden",transition:"border-color 0.2s"}}>
+              {/* Main row — clickable */}
+              <div style={{padding:"12px 16px",display:"flex",gap:12,alignItems:"center",cursor:"pointer"}} onClick={()=>setExpanded(isExp?null:i.id)}>
+                <span style={{fontSize:22,flexShrink:0}}>{typeIcon[i.type]||"💬"}</span>
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:3}}>
+                    <span style={{fontWeight:600,fontSize:14,color:"#e8f4f8"}}>{client?.name||i.clientName}</span>
+                    <Badge label={i.type} color={typeColor[i.type]||"#00d4ff"}/>
+                    <span style={{fontSize:11,color:"#7a9bb5"}}>{i.date}</span>
+                  </div>
+                  <div style={{fontSize:13,color:"#7a9bb5",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{i.note}</div>
                 </div>
-                <div style={{fontSize:13,color:"#b0ccd8",lineHeight:1.6}}>{i.note}</div>
+                <span style={{color:"#7a9bb5",fontSize:12}}>{isExp?"▲":"▼"}</span>
               </div>
+              {/* Expanded */}
+              {isExp&&(
+                <div style={{padding:"0 16px 14px",borderTop:"1px solid rgba(0,212,255,0.08)"}}>
+                  {editing===i.id ? (
+                    <div style={{marginTop:10}}>
+                      <textarea value={editNote} onChange={e=>setEditNote(e.target.value)} rows={3}
+                        style={{width:"100%",padding:"8px 10px",background:"rgba(0,212,255,0.05)",border:"1px solid rgba(0,212,255,0.2)",borderRadius:8,color:"#e8f4f8",fontSize:13,resize:"vertical",outline:"none",fontFamily:"'Barlow',sans-serif",boxSizing:"border-box",marginBottom:8}}/>
+                      <div style={{display:"flex",gap:8,justifyContent:"flex-end"}}>
+                        <button onClick={()=>setEditing(null)} style={{padding:"5px 12px",borderRadius:6,border:"1px solid rgba(255,255,255,0.1)",background:"transparent",color:"#7a9bb5",fontSize:12,cursor:"pointer"}}>Cancelar</button>
+                        <button onClick={()=>saveEdit(i.id)} style={{padding:"5px 12px",borderRadius:6,border:"none",background:"linear-gradient(90deg,#00d4ff,#0066ff)",color:"#fff",fontSize:12,cursor:"pointer",fontWeight:600}}>Salvar</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{marginTop:10}}>
+                      <div style={{fontSize:13,color:"#b0ccd8",lineHeight:1.6,whiteSpace:"pre-line",marginBottom:10}}>{i.note}</div>
+                      <div style={{display:"flex",gap:8}}>
+                        <button onClick={()=>{setEditing(i.id);setEditNote(i.note);}}
+                          style={{padding:"4px 12px",borderRadius:6,border:"1px solid rgba(0,212,255,0.2)",background:"transparent",color:"#00d4ff",fontSize:12,cursor:"pointer"}}>✏️ Editar</button>
+                        <button onClick={()=>navigator.clipboard.writeText(i.note)}
+                          style={{padding:"4px 12px",borderRadius:6,border:"1px solid rgba(255,255,255,0.08)",background:"transparent",color:"#7a9bb5",fontSize:12,cursor:"pointer"}}>📋 Copiar</button>
+                        <button onClick={()=>del(i.id)}
+                          style={{padding:"4px 12px",borderRadius:6,border:"1px solid rgba(255,45,120,0.2)",background:"transparent",color:"#ff2d78",fontSize:12,cursor:"pointer"}}>Excluir</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}
+        {sorted.length===0&&<div style={{textAlign:"center",padding:48,color:"#7a9bb5"}}>Nenhuma interação.</div>}
       </div>
-      {modal&&<Modal title="Registrar Interação" onClose={()=>setModal(false)}>
+
+      {modal&&<Modal title="Nova Interação" onClose={()=>setModal(false)}>
         <div style={{marginBottom:14}}>
-          <label style={lblStyle}>Cliente</label>
+          <label style={{fontSize:12,fontWeight:600,color:"#7a9bb5",display:"block",marginBottom:6,textTransform:"uppercase",letterSpacing:0.8,fontFamily:"'Barlow Condensed',sans-serif"}}>Cliente</label>
           <select value={form.clientId} onChange={e=>setForm(p=>({...p,clientId:e.target.value}))} style={fldStyle}>
             <option value="">Selecione...</option>
             {clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
@@ -845,11 +970,11 @@ function Interactions({interactions, setInteractions, clients}) {
         </div>
         <SelField label="Tipo" value={form.type} onChange={e=>setForm(p=>({...p,type:e.target.value}))} options={INTERACTION_TYPES}/>
         <Field label="Data" type="date" value={form.date} onChange={e=>setForm(p=>({...p,date:e.target.value}))}/>
-        <Field label="Responsável" value={form.author} onChange={e=>setForm(p=>({...p,author:e.target.value}))}/>
         <div style={{marginBottom:14}}>
-          <label style={lblStyle}>Anotação</label>
-          <textarea value={form.note} onChange={e=>setForm(p=>({...p,note:e.target.value}))} rows={4} style={{...fldStyle,resize:"vertical"}}/>
+          <label style={{fontSize:12,fontWeight:600,color:"#7a9bb5",display:"block",marginBottom:6,textTransform:"uppercase",letterSpacing:0.8,fontFamily:"'Barlow Condensed',sans-serif"}}>Nota</label>
+          <textarea value={form.note} onChange={e=>setForm(p=>({...p,note:e.target.value}))} rows={3} style={{...fldStyle,resize:"vertical"}}/>
         </div>
+        <Field label="Autor" value={form.author} onChange={e=>setForm(p=>({...p,author:e.target.value}))} placeholder="VIVAI"/>
         <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
           <Btn variant="secondary" onClick={()=>setModal(false)}>Cancelar</Btn>
           <Btn onClick={save}>Salvar</Btn>
@@ -858,6 +983,7 @@ function Interactions({interactions, setInteractions, clients}) {
     </div>
   );
 }
+
 
 function Tasks({tasks, setTasks, clients}) {
   const [modal, setModal] = useState(false);
@@ -1377,6 +1503,348 @@ function Finance({clients, setClients}) {
 }
 
 
+// ══ NEGÓCIOS ══════════════════════════════════════════════════════════════════
+
+function Negocios({clients, interactions}) {
+  const [deals, setDeals] = React.useState(() => {
+    try { return JSON.parse(localStorage.getItem("vivai_deals")||"[]"); } catch { return []; }
+  });
+  const [modal, setModal] = React.useState(null);
+  const [form, setForm]   = React.useState({clientId:"",title:"",value:"",stage:"Proposta",desc:"",quoteUrl:"",date:today()});
+  const [panel, setPanel] = React.useState(null);
+  const [editForm, setEditForm] = React.useState({});
+
+  const save = (d) => { setDeals(d); try { localStorage.setItem("vivai_deals",JSON.stringify(d)); } catch {} };
+
+  const addDeal = () => {
+    const d = {...form, id:Date.now(), value:parseFloat(String(form.value).replace(",","."))||0, createdAt:today(), activities:[]};
+    save([...deals, d]);
+    setModal(null);
+    setForm({clientId:"",title:"",value:"",stage:"Proposta",desc:"",quoteUrl:"",date:today()});
+  };
+
+  const updateDeal = (id, fields) => save(deals.map(d=>d.id===id?{...d,...fields}:d));
+  const delDeal = id => { if(confirm("Remover negócio?")) save(deals.filter(d=>d.id!==id)); };
+
+  const addActivity = (dealId, note) => {
+    save(deals.map(d=>d.id===dealId?{...d,activities:[...(d.activities||[]),{id:Date.now(),note,date:today()}]}:d));
+  };
+
+  const stageColor = {"Lead":"#7a9bb5","Qualificado":"#00d4ff","Proposta":"#ffb800","Negociação":"#ff6b35","Fechado":"#27AE60","Perdido":"#ff2d78"};
+  const dealStages = ["Lead","Qualificado","Proposta","Negociação","Fechado","Perdido"];
+
+  const totalPipeline = deals.filter(d=>d.stage!=="Fechado"&&d.stage!=="Perdido").reduce((s,d)=>s+d.value,0);
+  const totalFechado  = deals.filter(d=>d.stage==="Fechado").reduce((s,d)=>s+d.value,0);
+  const totalPerdido  = deals.filter(d=>d.stage==="Perdido").reduce((s,d)=>s+d.value,0);
+
+  const inp3 = {background:"rgba(0,212,255,0.05)",border:"1px solid rgba(0,212,255,0.2)",borderRadius:8,color:"#e8f4f8",fontSize:13,padding:"8px 10px",outline:"none",fontFamily:"'Barlow',sans-serif",width:"100%",boxSizing:"border-box"};
+
+  return (
+    <div className="fade-in">
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:24}}>
+        <div>
+          <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:38,letterSpacing:2,lineHeight:1}}><GradText>Negócios</GradText></div>
+          <div style={{color:"#7a9bb5",fontSize:13,marginTop:4}}>Projetos, propostas e deals</div>
+        </div>
+        <Btn onClick={()=>setModal("add")}>+ Novo Negócio</Btn>
+      </div>
+
+      {/* KPIs */}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:14,marginBottom:24}}>
+        {[
+          {label:"Pipeline ativo",value:fmt(totalPipeline),color:"#00d4ff",icon:"📊"},
+          {label:"Fechados",value:fmt(totalFechado),color:"#27AE60",icon:"🏆"},
+          {label:"Perdidos",value:fmt(totalPerdido),color:"#ff2d78",icon:"❌"},
+        ].map(k=>(
+          <div key={k.label} style={{background:"rgba(255,255,255,0.03)",border:"1px solid rgba(0,212,255,0.12)",borderRadius:12,padding:"16px 18px"}}>
+            <div style={{fontSize:20,marginBottom:6}}>{k.icon}</div>
+            <div style={{fontSize:11,color:"#7a9bb5",textTransform:"uppercase",letterSpacing:1,fontFamily:"'Barlow Condensed',sans-serif",marginBottom:4}}>{k.label}</div>
+            <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:24,color:k.color}}>{k.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Deals list */}
+      <div style={{display:"grid",gap:10}}>
+        {deals.length===0&&(
+          <div style={{textAlign:"center",padding:"48px 0",color:"#7a9bb5",border:"1px dashed rgba(0,212,255,0.15)",borderRadius:12}}>
+            Nenhum negócio ainda.<br/>
+            <span style={{color:"#00d4ff",cursor:"pointer",fontSize:12}} onClick={()=>setModal("add")}>+ Criar primeiro negócio →</span>
+          </div>
+        )}
+        {deals.map(d=>{
+          const client = clients.find(c=>c.id===d.clientId);
+          const isOpen = panel===d.id;
+          return (
+            <div key={d.id} style={{background:"rgba(255,255,255,0.03)",border:`1px solid ${isOpen?"rgba(0,212,255,0.3)":"rgba(0,212,255,0.1)"}`,borderRadius:12,overflow:"hidden"}}>
+              <div style={{padding:"14px 18px",display:"flex",gap:14,alignItems:"center",cursor:"pointer"}} onClick={()=>setPanel(isOpen?null:d.id)}>
+                {client&&<Avatar name={client.name} size={38}/>}
+                <div style={{flex:1,minWidth:0}}>
+                  <div style={{fontWeight:600,fontSize:15,color:"#e8f4f8"}}>{d.title}</div>
+                  <div style={{fontSize:12,color:"#7a9bb5"}}>{client?.name||"—"} · {d.date}</div>
+                </div>
+                <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                  <span style={{fontSize:12,fontWeight:600,padding:"3px 10px",borderRadius:20,background:`${stageColor[d.stage]}22`,color:stageColor[d.stage],border:`1px solid ${stageColor[d.stage]}44`}}>{d.stage}</span>
+                  <span style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:20,color:"#ffb800"}}>{fmt(d.value)}</span>
+                </div>
+                <span style={{color:"#7a9bb5",fontSize:12}}>{isOpen?"▲":"▼"}</span>
+              </div>
+              {isOpen&&(
+                <div style={{padding:"0 18px 16px",borderTop:"1px solid rgba(0,212,255,0.08)"}}>
+                  {/* Stage selector */}
+                  <div style={{display:"flex",gap:8,marginTop:12,marginBottom:12,flexWrap:"wrap"}}>
+                    {dealStages.map(s=>(
+                      <button key={s} onClick={()=>updateDeal(d.id,{stage:s})}
+                        style={{padding:"4px 12px",borderRadius:20,border:"none",cursor:"pointer",fontSize:11,fontWeight:600,
+                          background:d.stage===s?`${stageColor[s]}33`:"rgba(255,255,255,0.05)",
+                          color:d.stage===s?stageColor[s]:"#7a9bb5"}}>
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                  {/* Description */}
+                  {d.desc&&<div style={{fontSize:13,color:"#b0ccd8",lineHeight:1.6,marginBottom:10,padding:"8px 10px",background:"rgba(255,255,255,0.02)",borderRadius:8}}>{d.desc}</div>}
+                  {/* Quote link */}
+                  {d.quoteUrl&&<div style={{marginBottom:10}}>
+                    <a href={d.quoteUrl} target="_blank" style={{color:"#00d4ff",fontSize:12,textDecoration:"none"}}>📄 Ver orçamento</a>
+                  </div>}
+                  {/* Gerar orçamento */}
+                  {client&&<div style={{marginBottom:12}}>
+                    <button onClick={()=>window.open(`/quote?id=${client.id}`,'_blank')}
+                      style={{padding:"6px 14px",borderRadius:6,border:"1px solid rgba(255,184,0,0.35)",background:"rgba(255,184,0,0.08)",color:"#ffb800",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"'Barlow',sans-serif"}}>
+                      💰 Gerar / ver orçamento
+                    </button>
+                  </div>}
+                  {/* Activities */}
+                  {(d.activities||[]).length>0&&(
+                    <div style={{marginBottom:10}}>
+                      <div style={{fontSize:10,color:"#7a9bb5",marginBottom:6,textTransform:"uppercase",letterSpacing:1,fontFamily:"'Barlow Condensed',sans-serif"}}>Atividades</div>
+                      {d.activities.map(a=>(
+                        <div key={a.id} style={{fontSize:12,color:"#b0ccd8",padding:"5px 0",borderBottom:"1px solid rgba(255,255,255,0.04)"}}>
+                          <span style={{color:"#7a9bb5",marginRight:8}}>{a.date}</span>{a.note}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {/* Add activity */}
+                  <AddActivityInline onAdd={note=>addActivity(d.id,note)}/>
+                  {/* Delete */}
+                  <button onClick={()=>delDeal(d.id)} style={{marginTop:8,padding:"4px 12px",borderRadius:6,border:"1px solid rgba(255,45,120,0.2)",background:"transparent",color:"#ff2d78",fontSize:11,cursor:"pointer"}}>Excluir negócio</button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {modal==="add"&&(
+        <div style={{position:"fixed",inset:0,background:"rgba(13,31,45,0.88)",zIndex:1000,display:"flex",alignItems:"center",justifyContent:"center",padding:24}}>
+          <div style={{background:"#122536",border:"1px solid rgba(0,212,255,0.3)",borderRadius:16,width:"100%",maxWidth:480,padding:"24px 28px"}}>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:20}}>
+              <div style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:20,letterSpacing:1,color:"#00d4ff"}}>Novo Negócio</div>
+              <button onClick={()=>setModal(null)} style={{background:"none",border:"none",color:"#7a9bb5",cursor:"pointer",fontSize:22}}>×</button>
+            </div>
+            <div style={{marginBottom:12}}>
+              <label style={{fontSize:11,fontWeight:600,color:"#7a9bb5",display:"block",marginBottom:5,textTransform:"uppercase",letterSpacing:0.8,fontFamily:"'Barlow Condensed',sans-serif"}}>Cliente</label>
+              <select value={form.clientId} onChange={e=>setForm(p=>({...p,clientId:Number(e.target.value)}))} style={inp3}>
+                <option value="">Selecione...</option>
+                {clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            {[["title","Título do negócio","Ex: Aftermovie Evento Corporativo"],["desc","Descrição","Detalhes do projeto..."],["value","Valor (R$)",""],["quoteUrl","Link do orçamento (opcional)",""]].map(([f,l,ph])=>(
+              <div key={f} style={{marginBottom:12}}>
+                <label style={{fontSize:11,fontWeight:600,color:"#7a9bb5",display:"block",marginBottom:5,textTransform:"uppercase",letterSpacing:0.8,fontFamily:"'Barlow Condensed',sans-serif"}}>{l}</label>
+                {f==="desc"?<textarea value={form[f]} onChange={e=>setForm(p=>({...p,[f]:e.target.value}))} placeholder={ph} rows={2} style={{...inp3,resize:"vertical"}}/>:<input value={form[f]} onChange={e=>setForm(p=>({...p,[f]:e.target.value}))} placeholder={ph} style={inp3}/>}
+              </div>
+            ))}
+            <div style={{marginBottom:16}}>
+              <label style={{fontSize:11,fontWeight:600,color:"#7a9bb5",display:"block",marginBottom:5,textTransform:"uppercase",letterSpacing:0.8,fontFamily:"'Barlow Condensed',sans-serif"}}>Etapa</label>
+              <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                {dealStages.map(s=><button key={s} onClick={()=>setForm(p=>({...p,stage:s}))} style={{padding:"4px 12px",borderRadius:20,border:"none",cursor:"pointer",fontSize:11,fontWeight:600,background:form.stage===s?`${stageColor[s]}33`:"rgba(255,255,255,0.05)",color:form.stage===s?stageColor[s]:"#7a9bb5"}}>{s}</button>)}
+              </div>
+            </div>
+            <div style={{display:"flex",gap:10,justifyContent:"flex-end"}}>
+              <button onClick={()=>setModal(null)} style={{padding:"9px 18px",borderRadius:8,border:"1px solid rgba(0,212,255,0.2)",background:"transparent",color:"#7a9bb5",fontSize:14,cursor:"pointer",fontFamily:"'Barlow',sans-serif"}}>Cancelar</button>
+              <button onClick={addDeal} style={{padding:"9px 20px",borderRadius:8,border:"none",background:"linear-gradient(90deg,#00d4ff,#0066ff)",color:"#fff",fontSize:14,fontWeight:600,cursor:"pointer",fontFamily:"'Barlow',sans-serif"}}>Salvar</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AddActivityInline({onAdd}) {
+  const [val, setVal] = React.useState("");
+  return (
+    <div style={{display:"flex",gap:8,marginTop:8}}>
+      <input value={val} onChange={e=>setVal(e.target.value)} placeholder="Registrar atividade..."
+        style={{flex:1,background:"rgba(0,212,255,0.05)",border:"1px solid rgba(0,212,255,0.15)",borderRadius:8,color:"#e8f4f8",fontSize:12,padding:"6px 10px",outline:"none",fontFamily:"'Barlow',sans-serif"}}
+        onKeyDown={e=>{if(e.key==="Enter"&&val.trim()){onAdd(val);setVal("");}}}/>
+      <button onClick={()=>{if(val.trim()){onAdd(val);setVal("");}}}
+        style={{padding:"6px 12px",borderRadius:8,border:"1px solid rgba(0,212,255,0.2)",background:"transparent",color:"#00d4ff",fontSize:12,cursor:"pointer"}}>+</button>
+    </div>
+  );
+}
+
+// ══ AGENDA ════════════════════════════════════════════════════════════════════
+
+function Agenda({tasks, interactions, clients}) {
+  const [mode, setMode]     = React.useState("month");
+  const [current, setCurrent] = React.useState(new Date());
+
+  const yr  = current.getFullYear();
+  const mo  = current.getMonth();
+  const yrmo = `${yr}-${String(mo+1).padStart(2,"0")}`;
+
+  const navigate = (dir) => {
+    const d = new Date(current);
+    if(mode==="month") d.setMonth(d.getMonth()+dir);
+    else if(mode==="week") d.setDate(d.getDate()+dir*7);
+    else d.setDate(d.getDate()+dir);
+    setCurrent(d);
+  };
+
+  const fmtDate = d => d.toLocaleDateString("pt-BR",{day:"2-digit",month:"short"});
+  const modeLabel = mode==="month"
+    ? current.toLocaleDateString("pt-BR",{month:"long",year:"numeric"})
+    : mode==="week" ? `Semana de ${fmtDate(getWeekStart(current))}`
+    : current.toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"long"});
+
+  function getWeekStart(d) {
+    const s = new Date(d);
+    s.setDate(s.getDate()-s.getDay());
+    return s;
+  }
+
+  // Build events for a given date string
+  const getEvents = (dateStr) => {
+    const evts = [];
+    tasks.filter(t=>t.dueDate===dateStr).forEach(t=>{
+      const c = clients.find(x=>x.id===t.clientId);
+      evts.push({type:"task",label:t.title,client:c?.name,color:t.done?"#27AE60":t.dueDate<today()?"#ff2d78":"#ffb800",icon:"✓",done:t.done});
+    });
+    interactions.filter(i=>i.date===dateStr).forEach(i=>{
+      const c = clients.find(x=>x.id===i.clientId);
+      evts.push({type:"interaction",label:i.note.slice(0,40),client:c?.name||i.clientName,color:"#00d4ff",icon:"💬"});
+    });
+    return evts;
+  };
+
+  // Month view
+  const renderMonth = () => {
+    const firstDay = new Date(yr,mo,1).getDay();
+    const daysInMonth = new Date(yr,mo+1,0).getDate();
+    const cells = [];
+    for(let i=0;i<firstDay;i++) cells.push(null);
+    for(let d=1;d<=daysInMonth;d++) cells.push(d);
+    while(cells.length%7!==0) cells.push(null);
+    const weeks = [];
+    for(let i=0;i<cells.length;i+=7) weeks.push(cells.slice(i,i+7));
+    const todayStr = today();
+    return (
+      <div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2,marginBottom:4}}>
+          {["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"].map(d=>(
+            <div key={d} style={{textAlign:"center",fontSize:11,color:"#7a9bb5",padding:"6px 0",fontFamily:"'Barlow Condensed',sans-serif",letterSpacing:0.5}}>{d}</div>
+          ))}
+        </div>
+        {weeks.map((week,wi)=>(
+          <div key={wi} style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:2,marginBottom:2}}>
+            {week.map((d,di)=>{
+              if(!d) return <div key={di} style={{minHeight:80,background:"rgba(255,255,255,0.01)",borderRadius:8}}/>;
+              const ds = `${yr}-${String(mo+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+              const evts = getEvents(ds);
+              const isToday = ds===todayStr;
+              return (
+                <div key={di} style={{minHeight:80,background:isToday?"rgba(0,212,255,0.08)":"rgba(255,255,255,0.02)",borderRadius:8,padding:"6px",border:`1px solid ${isToday?"rgba(0,212,255,0.3)":"rgba(255,255,255,0.05)"}`}}>
+                  <div style={{fontSize:12,fontWeight:isToday?700:400,color:isToday?"#00d4ff":"#7a9bb5",marginBottom:4}}>{d}</div>
+                  {evts.slice(0,3).map((e,ei)=>(
+                    <div key={ei} title={`${e.client}: ${e.label}`} style={{fontSize:10,color:e.color,background:`${e.color}18`,borderRadius:4,padding:"2px 5px",marginBottom:2,whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>
+                      {e.icon} {e.client||""} {e.label}
+                    </div>
+                  ))}
+                  {evts.length>3&&<div style={{fontSize:9,color:"#7a9bb5"}}>+{evts.length-3}</div>}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // Week/Day view
+  const renderList = (days) => {
+    return days.map(d=>{
+      const ds = d.toISOString().split("T")[0];
+      const evts = getEvents(ds);
+      const isToday = ds===today();
+      return (
+        <div key={ds} style={{marginBottom:12}}>
+          <div style={{fontSize:13,fontWeight:600,color:isToday?"#00d4ff":"#e8f4f8",marginBottom:6,padding:"6px 10px",background:isToday?"rgba(0,212,255,0.08)":"rgba(255,255,255,0.03)",borderRadius:8,border:`1px solid ${isToday?"rgba(0,212,255,0.2)":"rgba(255,255,255,0.06)"}`}}>
+            {d.toLocaleDateString("pt-BR",{weekday:"long",day:"2-digit",month:"long"})}{isToday&&<span style={{fontSize:10,marginLeft:8,color:"#00d4ff"}}>HOJE</span>}
+          </div>
+          {evts.length===0&&<div style={{fontSize:12,color:"rgba(122,155,181,0.4)",paddingLeft:10}}>Sem eventos</div>}
+          {evts.map((e,ei)=>(
+            <div key={ei} style={{display:"flex",gap:10,alignItems:"center",padding:"8px 10px",borderRadius:8,marginBottom:4,background:"rgba(255,255,255,0.02)",border:`1px solid ${e.color}22`}}>
+              <span style={{fontSize:14}}>{e.icon}</span>
+              <div style={{flex:1}}>
+                <div style={{fontSize:13,color:e.color,fontWeight:500}}>{e.label}</div>
+                {e.client&&<div style={{fontSize:11,color:"#7a9bb5"}}>{e.client}</div>}
+              </div>
+              <div style={{fontSize:10,padding:"2px 8px",borderRadius:10,background:`${e.color}22`,color:e.color}}>{e.type==="task"?"Tarefa":"Interação"}</div>
+            </div>
+          ))}
+        </div>
+      );
+    });
+  };
+
+  const getWeekDays = () => {
+    const start = getWeekStart(current);
+    return Array.from({length:7},(_,i)=>{ const d=new Date(start); d.setDate(d.getDate()+i); return d; });
+  };
+
+  return (
+    <div className="fade-in">
+      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:24}}>
+        <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:38,letterSpacing:2}}><GradText>Agenda</GradText></div>
+        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+          {["month","week","day"].map(m=>(
+            <button key={m} onClick={()=>setMode(m)} style={{padding:"6px 14px",borderRadius:6,border:"1px solid",cursor:"pointer",fontSize:12,fontWeight:600,fontFamily:"'Barlow Condensed',sans-serif",textTransform:"uppercase",letterSpacing:0.5,
+              borderColor:mode===m?"#00d4ff":"rgba(0,212,255,0.2)",background:mode===m?"rgba(0,212,255,0.15)":"transparent",color:mode===m?"#00d4ff":"#7a9bb5"}}>
+              {m==="month"?"Mês":m==="week"?"Semana":"Dia"}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Nav */}
+      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:20}}>
+        <button onClick={()=>navigate(-1)} style={{background:"rgba(0,212,255,0.1)",border:"1px solid rgba(0,212,255,0.3)",borderRadius:6,padding:"5px 12px",color:"#00d4ff",cursor:"pointer",fontSize:16}}>‹</button>
+        <span style={{fontFamily:"'Barlow Condensed',sans-serif",fontSize:18,letterSpacing:1,color:"#e8f4f8",textTransform:"capitalize",flex:1,textAlign:"center"}}>{modeLabel}</span>
+        <button onClick={()=>navigate(1)} style={{background:"rgba(0,212,255,0.1)",border:"1px solid rgba(0,212,255,0.3)",borderRadius:6,padding:"5px 12px",color:"#00d4ff",cursor:"pointer",fontSize:16}}>›</button>
+        <button onClick={()=>setCurrent(new Date())} style={{background:"transparent",border:"1px solid rgba(0,212,255,0.2)",borderRadius:6,padding:"5px 12px",color:"#7a9bb5",cursor:"pointer",fontSize:12,fontFamily:"'Barlow',sans-serif"}}>Hoje</button>
+      </div>
+
+      {/* Legend */}
+      <div style={{display:"flex",gap:16,marginBottom:16}}>
+        {[["#ffb800","✓","Tarefas"],["#00d4ff","💬","Interações"]].map(([c,ic,l])=>(
+          <div key={l} style={{display:"flex",alignItems:"center",gap:6,fontSize:12,color:"#7a9bb5"}}>
+            <div style={{background:c,width:8,height:8,borderRadius:2}}/>{ic} {l}
+          </div>
+        ))}
+      </div>
+
+      {mode==="month"&&renderMonth()}
+      {mode==="week"&&renderList(getWeekDays())}
+      {mode==="day"&&renderList([current])}
+    </div>
+  );
+}
+
+
 // ══ ROOT APP ══════════════════════════════════════════════════════════
 
 function App() {
@@ -1418,9 +1886,11 @@ function App() {
     {id:"dashboard",     icon:"◈",  label:"Dashboard"},
     {id:"clients",       icon:"👤", label:"Clientes"},
     {id:"pipeline",      icon:"⟶", label:"Pipeline"},
+    {id:"negocios",      icon:"🤝", label:"Negócios"},
     {id:"interactions",  icon:"💬", label:"Interações"},
     {id:"tasks",         icon:"✓",  label:"Tarefas"},
     {id:"finance",       icon:"💵", label:"Financeiro"},
+    {id:"agenda",        icon:"📅", label:"Agenda"},
   ];
 
   return (
@@ -1484,9 +1954,11 @@ function App() {
       <main style={{marginLeft:240,flex:1,padding:"36px 40px",minHeight:"100vh",background:"radial-gradient(ellipse at 20% 50%, rgba(0,100,255,0.04) 0%, transparent 60%), radial-gradient(ellipse at 80% 20%, rgba(255,45,120,0.04) 0%, transparent 60%)"}}>
         {view==="dashboard"    && <Dashboard clients={clients} interactions={interactions} tasks={tasks} leadScores={leadScores} analyzing={analyzing} onAnalyze={analyzeLeads}/>}
         {view==="clients"      && <Clients clients={clients} setClients={setC} interactions={interactions} setInteractions={setI} tasks={tasks} setTasks={setT} leadScores={leadScores}/>}
-        {view==="pipeline"     && <Pipeline clients={clients} setClients={setC}/>}
+        {view==="pipeline"     && <Pipeline clients={clients} setClients={setC} interactions={interactions} setInteractions={setI} tasks={tasks} setTasks={setT}/>}
         {view==="interactions" && <Interactions interactions={interactions} setInteractions={setI} clients={clients}/>}
         {view==="tasks"        && <Tasks tasks={tasks} setTasks={setT} clients={clients}/>}
+        {view==="negocios"     && <Negocios clients={clients} interactions={interactions}/>}
+        {view==="agenda"       && <Agenda tasks={tasks} interactions={interactions} clients={clients}/>}
         {view==="finance"      && <Finance clients={clients} setClients={setC}/>}
       </main>
     </div>
