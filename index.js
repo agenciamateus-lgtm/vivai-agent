@@ -147,12 +147,30 @@ app.post("/api/quote/pdf", async (req, res) => {
 
 
 // ── Proxy IA — chat do painel de lead ────────────────────────────────────────
+async function callAnthropicWithRetry(params, retries = 3, delayMs = 2000) {
+  const Anthropic = require("@anthropic-ai/sdk");
+  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      return await client.messages.create(params);
+    } catch (err) {
+      const isOverloaded = err.status === 529 || (err.message && err.message.includes("overloaded"));
+      const isRateLimit  = err.status === 429;
+      if ((isOverloaded || isRateLimit) && attempt < retries) {
+        const wait = delayMs * attempt;
+        console.log(`⏳ Anthropic overloaded (attempt ${attempt}/${retries}), retrying in ${wait}ms...`);
+        await new Promise(r => setTimeout(r, wait));
+        continue;
+      }
+      throw err;
+    }
+  }
+}
+
 app.post("/api/chat", async (req, res) => {
   try {
     const { system, messages, max_tokens } = req.body;
-    const Anthropic = require("@anthropic-ai/sdk");
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-    const response = await client.messages.create({
+    const response = await callAnthropicWithRetry({
       model: "claude-sonnet-4-20250514",
       max_tokens: max_tokens || 600,
       system,
@@ -160,8 +178,15 @@ app.post("/api/chat", async (req, res) => {
     });
     res.json({ content: response.content });
   } catch (err) {
-    console.error("❌ /api/chat error:", err.message);
-    res.status(500).json({ error: err.message });
+    const status = err.status || 500;
+    console.error(`❌ /api/chat error: ${status}`, err.message);
+    // Return user-friendly message for overloaded errors
+    if (status === 529 || (err.message && err.message.includes("overloaded"))) {
+      return res.status(529).json({
+        content: [{ type: "text", text: "⏳ A IA está temporariamente sobrecarregada. Aguarde alguns segundos e tente novamente." }]
+      });
+    }
+    res.status(status).json({ error: err.message });
   }
 });
 
@@ -186,7 +211,7 @@ app.post("/api/analyze-leads", async (req, res) => {
       };
     });
 
-    const response = await ai.messages.create({
+    const response = await callAnthropicWithRetry({
       model: "claude-sonnet-4-20250514",
       max_tokens: 2000,
       messages: [{
