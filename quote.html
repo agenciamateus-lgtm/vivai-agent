@@ -161,6 +161,8 @@
     <div style="display:flex;flex-direction:column;gap:8px">
       <button id="copy-btn" onclick="copyQuote()" class="btn-primary" style="width:100%">📋 Copiar orçamento</button>
       <button onclick="downloadPDF()" class="btn-secondary" style="width:100%">📄 Gerar Proposta PDF</button>
+      <button id="save-crm-btn" onclick="saveToCRM()" style="width:100%;padding:11px 20px;border-radius:8px;border:1px solid rgba(39,174,96,0.4);background:rgba(39,174,96,0.1);color:#27AE60;font-size:14px;font-weight:600;cursor:pointer;font-family:'Barlow',sans-serif">💾 Salvar no CRM</button>
+      <div id="save-crm-feedback" style="display:none;text-align:center;font-size:12px;color:#27AE60;padding:4px 0">✓ Orçamento salvo no histórico do lead!</div>
     </div>
   </div>
 </div>
@@ -220,29 +222,33 @@ function init() {
 // ── Team ──────────────────────────────────────────────────────────────────────
 function renderTeam() {
   const el = document.getElementById("team-list");
+  if(!el) return;
   el.innerHTML = TEAM.map(t => {
     const qty = state.team[t.key]||0;
     const price = state.teamPrices[t.key]||t.price;
     const total = qty * price * state.diarias;
-    return `<div class="team-row ${qty>0?"active":""}" id="tr-${t.key}">
-      <span style="font-size:20px">${t.icon}</span>
-      <div style="flex:1">
-        <div style="font-size:14px;font-weight:500">${t.label}</div>
-        <div style="font-size:11px;color:#7a9bb5;display:flex;align-items:center;gap:4px">
-          R$ <input type="number" value="${price}" onchange="setTeamPrice('${t.key}',this.value)"
-            style="width:65px;font-size:11px;padding:2px 6px;background:transparent;border:none;border-bottom:1px solid rgba(0,212,255,0.2);color:#7a9bb5;text-align:right"
-            onclick="event.stopPropagation()"/> /dia
-        </div>
-      </div>
-      <div style="display:flex;align-items:center;gap:6px">
-        <button onclick="changeTeam('${t.key}',-1)" style="width:28px;height:28px;border-radius:6px;background:rgba(255,255,255,0.06);border:1px solid rgba(0,212,255,0.15);color:#e8f4f8;font-size:16px">−</button>
-        <span style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:${qty>0?"#00d4ff":"#7a9bb5"};min-width:18px;text-align:center">${qty}</span>
-        <button onclick="changeTeam('${t.key}',1)" style="width:28px;height:28px;border-radius:6px;background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.3);color:#00d4ff;font-size:16px">+</button>
-      </div>
-      ${qty>0?`<div style="font-size:13px;font-weight:600;color:#ffb800;min-width:86px;text-align:right;font-family:'Barlow Condensed',sans-serif">${fmt(total)}</div>`:""}
-    </div>`;
+    const activeClass = qty > 0 ? "team-row active" : "team-row";
+    const qtyColor = qty > 0 ? "#00d4ff" : "#7a9bb5";
+    let html = '<div class="' + activeClass + '" id="tr-' + t.key + '">';
+    html += '<span style="font-size:20px">' + t.icon + '</span>';
+    html += '<div style="flex:1">';
+    html += '<div style="font-size:14px;font-weight:500">' + t.label + '</div>';
+    html += '<div style="font-size:11px;color:#7a9bb5;display:flex;align-items:center;gap:4px">';
+    html += 'R$ <input type="number" value="' + price + '" onchange="setTeamPrice('' + t.key + '',this.value)" ';
+    html += 'style="width:65px;font-size:11px;padding:2px 6px;background:transparent;border:none;border-bottom:1px solid rgba(0,212,255,0.2);color:#7a9bb5;text-align:right" ';
+    html += 'onclick="event.stopPropagation()"/> /dia';
+    html += '</div></div>';
+    html += '<div style="display:flex;align-items:center;gap:6px">';
+    html += '<button onclick="changeTeam('' + t.key + '',-1)" style="width:28px;height:28px;border-radius:6px;background:rgba(255,255,255,0.06);border:1px solid rgba(0,212,255,0.15);color:#e8f4f8;font-size:16px">−</button>';
+    html += '<span style="font-family:'Bebas Neue',sans-serif;font-size:20px;color:' + qtyColor + ';min-width:18px;text-align:center">' + qty + '</span>';
+    html += '<button onclick="changeTeam('' + t.key + '',1)" style="width:28px;height:28px;border-radius:6px;background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.3);color:#00d4ff;font-size:16px">+</button>';
+    html += '</div>';
+    if(qty > 0) html += '<div style="font-size:13px;font-weight:600;color:#ffb800;min-width:86px;text-align:right;font-family:'Barlow Condensed',sans-serif">' + fmt(total) + '</div>';
+    html += '</div>';
+    return html;
   }).join("");
 }
+
 
 function changeTeam(key, delta) {
   state.team[key] = Math.max(0,(state.team[key]||0)+delta);
@@ -264,24 +270,31 @@ function changeDiarias(d) {
 // ── Edições ───────────────────────────────────────────────────────────────────
 function renderEdicoes() {
   const el = document.getElementById("edicao-grid");
+  if(!el) return;
   el.style.gridTemplateColumns = "repeat(3,1fr)";
   el.innerHTML = EDICOES.map(e => {
     const active = state.edicoes[e.key];
-    const price = state.edicaoPrices[e.key]||e.price;
-    return `<div class="edicao-card ${active?"active":""}" onclick="toggleEdicao('${e.key}')">
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
-        <div style="width:16px;height:16px;border-radius:4px;border:2px solid ${active?"#ffb800":"rgba(0,212,255,0.3)"};background:${active?"rgba(255,184,0,0.3)":"transparent"};display:flex;align-items:center;justify-content:center;font-size:10px;color:#ffb800;flex-shrink:0">${active?"✓":""}</div>
-        <span style="font-size:16px">${e.icon}</span>
-      </div>
-      <div style="font-size:13px;font-weight:500;margin-bottom:4px">${e.label}</div>
-      <div style="display:flex;align-items:center;justify-content:center;gap:3px" onclick="event.stopPropagation()">
-        <span style="font-size:11px;color:#7a9bb5">R$</span>
-        <input type="number" value="${price}" onchange="setEdicaoPrice('${e.key}',this.value)"
-          style="width:60px;font-size:11px;padding:2px 4px;text-align:center;background:transparent;border:none;border-bottom:1px solid ${active?"rgba(255,184,0,0.3)":"rgba(0,212,255,0.15)"};color:${active?"#ffb800":"#7a9bb5"}"/>
-      </div>
-    </div>`;
+    const price  = state.edicaoPrices[e.key] || e.price;
+    const checkBg    = active ? "rgba(255,184,0,0.3)" : "transparent";
+    const checkBorder = active ? "#ffb800" : "rgba(0,212,255,0.3)";
+    const cardClass  = active ? "edicao-card active" : "edicao-card";
+    const priceColor = active ? "#ffb800" : "#7a9bb5";
+    const inputBorder = active ? "rgba(255,184,0,0.3)" : "rgba(0,212,255,0.15)";
+    let html = '<div class="' + cardClass + '" onclick="toggleEdicao('' + e.key + '')">';
+    html += '<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">';
+    html += '<div style="width:16px;height:16px;border-radius:4px;border:2px solid ' + checkBorder + ';background:' + checkBg + ';display:flex;align-items:center;justify-content:center;font-size:10px;color:#ffb800;flex-shrink:0">' + (active?"✓":"") + '</div>';
+    html += '<span style="font-size:16px">' + e.icon + '</span>';
+    html += '</div>';
+    html += '<div style="font-size:13px;font-weight:500;margin-bottom:4px">' + e.label + '</div>';
+    html += '<div style="display:flex;align-items:center;justify-content:center;gap:3px" onclick="event.stopPropagation()">';
+    html += '<span style="font-size:11px;color:#7a9bb5">R$</span>';
+    html += '<input type="number" value="' + price + '" onchange="setEdicaoPrice('' + e.key + '',this.value)" ';
+    html += 'style="width:60px;font-size:11px;padding:2px 4px;text-align:center;background:transparent;border:none;border-bottom:1px solid ' + inputBorder + ';color:' + priceColor + '">';
+    html += '</div></div>';
+    return html;
   }).join("");
 }
+
 
 function toggleEdicao(key) {
   state.edicoes[key] = !state.edicoes[key];
@@ -525,6 +538,7 @@ async function loadFromBriefing(clientId) {
     if(parsed.transport) state.transport=parsed.transport;
     if(parsed.notes) document.getElementById("f-notes").value=parsed.notes;
     document.getElementById("f-client").value=client.name;
+    activeCrmClientId = client.id;
     if(parsed.reasoning){
       const banner = document.getElementById("ai-banner");
       document.getElementById("ai-reasoning").textContent=parsed.reasoning;
@@ -533,6 +547,113 @@ async function loadFromBriefing(clientId) {
     renderTeam(); renderEdicoes(); updateTransport(); updateSummary();
   } catch(e){console.error(e);}
   document.getElementById("loading-overlay").style.display="none";
+}
+
+// ── Save to CRM ───────────────────────────────────────────────────────────────
+let activeCrmClientId = null; // set when opened via ?id=
+
+async function saveToCRM() {
+  const r = calc();
+  const clientName = document.getElementById("f-client").value;
+  const event  = document.getElementById("f-event").value;
+  const date   = document.getElementById("f-date").value;
+
+  if(!clientName) {
+    alert("Preencha o nome do cliente para salvar no CRM.");
+    return;
+  }
+
+  const btn = document.getElementById("save-crm-btn");
+  btn.textContent = "⏳ Salvando...";
+  btn.disabled = true;
+
+  try {
+    // Load current CRM data
+    const crmData = await fetch("/api/data").then(r=>r.json());
+
+    // Find client by id (if opened from CRM) or by name
+    let client = null;
+    if(activeCrmClientId) {
+      client = crmData.clients?.find(c=>c.id===activeCrmClientId);
+    }
+    if(!client) {
+      client = crmData.clients?.find(c=>c.name.toLowerCase()===clientName.toLowerCase());
+    }
+
+    // Build interaction note
+    const teamLines = TEAM.filter(t=>state.team[t.key]>0)
+      .map(t=>`${state.team[t.key]}x ${t.label}: ${fmt(state.team[t.key]*(state.teamPrices[t.key]||t.price)*state.diarias)}`);
+    const edicaoLines = EDICOES.filter(e=>state.edicoes[e.key])
+      .map(e=>e.label);
+    const terceirosLines = state.terceiros.filter(i=>i.label)
+      .map(i=>`${i.icon} ${i.label}: ${fmt(parseMoney(i.value))}`);
+    const customLines = state.customItems.filter(i=>i.label)
+      .map(i=>`${i.label}: ${fmt(parseMoney(i.unitPrice)*(i.qty||1))}`);
+
+    const noteLines = [
+      `📋 Orçamento gerado — ${fmt(r.total)}`,
+      event ? `Evento: ${event}` : "",
+      date  ? `Data: ${date}`   : "",
+      `${state.diarias} diária${state.diarias>1?"s":""}`,
+      teamLines.length  ? `Equipe: ${teamLines.join(", ")}` : "",
+      edicaoLines.length ? `Edição: ${edicaoLines.join(", ")}` : "",
+      customLines.length ? `Adicionais: ${customLines.join(", ")}` : "",
+      terceirosLines.length ? `Terceiros: ${terceirosLines.join(", ")}` : "",
+      `Subtotal: ${fmt(r.subtotal)} | Caixa 10%: ${fmt(r.caixa)} | NF 6%: ${fmt(r.imposto)}`,
+      `TOTAL: ${fmt(r.total)}`,
+    ].filter(Boolean).join("\n");
+
+    const newInteraction = {
+      id: Date.now(),
+      clientId: client ? client.id : null,
+      clientName: clientName,
+      type: "Orçamento",
+      note: noteLines,
+      author: "VIVAI",
+      date: new Date().toISOString().split("T")[0],
+    };
+
+    // If client not found, show warning but still save with clientName
+    if(!client) {
+      const confirm_save = confirm(`Cliente "${clientName}" não encontrado no CRM. Salvar assim mesmo (sem vínculo com lead)?`);
+      if(!confirm_save) { btn.textContent="💾 Salvar no CRM"; btn.disabled=false; return; }
+    }
+
+    const interactions = [...(crmData.interactions||[]), newInteraction];
+    await fetch("/api/data", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({interactions})
+    });
+
+    // Also update client stage to "Proposta" if they're in Lead/Qualificado
+    if(client && (client.stage==="Lead"||client.stage==="Qualificado")) {
+      const clients = crmData.clients.map(c=>
+        c.id===client.id ? {...c, stage:"Proposta", value: Math.max(c.value||0, Math.round(r.total))} : c
+      );
+      await fetch("/api/data", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({clients})
+      });
+    }
+
+    btn.textContent="✓ Salvo!";
+    btn.style.background="rgba(39,174,96,0.2)";
+    btn.style.borderColor="rgba(39,174,96,0.5)";
+    document.getElementById("save-crm-feedback").style.display="block";
+    setTimeout(()=>{
+      btn.textContent="💾 Salvar no CRM";
+      btn.disabled=false;
+      btn.style.background="";
+      btn.style.borderColor="";
+    }, 3000);
+
+  } catch(e) {
+    alert("Erro ao salvar: "+e.message);
+    btn.textContent="💾 Salvar no CRM";
+    btn.disabled=false;
+  }
 }
 
 // ── Boot ──────────────────────────────────────────────────────────────────────
