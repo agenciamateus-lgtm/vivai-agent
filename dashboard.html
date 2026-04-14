@@ -1457,7 +1457,9 @@ function Finance({clients, setClients}) {
               <label style={{fontSize:11,fontWeight:600,color:"#7a9bb5",display:"block",marginBottom:5,textTransform:"uppercase",letterSpacing:0.8,fontFamily:"'Barlow Condensed',sans-serif"}}>Cliente</label>
               <select value={form.clientId} onChange={e=>setForm(p=>({...p,clientId:e.target.value}))} style={inp3}>
                 <option value="">Selecione...</option>
-                {clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+                {[...clients].sort((a,b)=>a.name.localeCompare(b.name,"pt-BR")).map(c=>(
+                  <option key={c.id} value={c.id}>{c.name}{c.company?` — ${c.company}`:""}</option>
+                ))}
               </select>
             </div>
             {/* Desc */}
@@ -1646,9 +1648,24 @@ function Negocios({clients, interactions}) {
             </div>
             <div style={{marginBottom:12}}>
               <label style={{fontSize:11,fontWeight:600,color:"#7a9bb5",display:"block",marginBottom:5,textTransform:"uppercase",letterSpacing:0.8,fontFamily:"'Barlow Condensed',sans-serif"}}>Cliente</label>
-              <select value={form.clientId} onChange={e=>setForm(p=>({...p,clientId:Number(e.target.value)}))} style={inp3}>
+              <select value={form.clientId} onChange={e=>{
+                if(e.target.value==="__new__"){
+                  const name=prompt("Nome do novo cliente:");
+                  if(name&&name.trim()){
+                    const newClient={id:Date.now(),name:name.trim(),company:"",stage:"Lead",value:0,tags:[],createdAt:today()};
+                    setClients(p=>[...p,newClient]);
+                    setForm(p=>({...p,clientId:newClient.id}));
+                  }
+                } else {
+                  setForm(p=>({...p,clientId:Number(e.target.value)}));
+                }
+              }} style={inp3}>
                 <option value="">Selecione...</option>
-                {clients.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+                <option value="__new__" style={{color:"#00d4ff",fontWeight:600}}>+ Novo cliente</option>
+                <option disabled style={{color:"rgba(122,155,181,0.4)"}}>──────────────</option>
+                {[...clients].sort((a,b)=>a.name.localeCompare(b.name,"pt-BR")).map(c=>(
+                  <option key={c.id} value={c.id}>{c.name}{c.company?` — ${c.company}`:""}</option>
+                ))}
               </select>
             </div>
             {[["title","Título do negócio","Ex: Aftermovie Evento Corporativo"],["desc","Descrição","Detalhes do projeto..."],["value","Valor (R$)",""],["quoteUrl","Link do orçamento (opcional)",""]].map(([f,l,ph])=>(
