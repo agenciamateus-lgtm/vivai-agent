@@ -100,9 +100,9 @@ input::placeholder{color:rgba(122,155,181,0.45)}
 <div class="card">
   <div class="sec">Número de diárias</div>
   <div style="display:flex;align-items:center;gap:14px">
-    <button class="cbtn" onclick="chgD(-1)" style="background:rgba(255,255,255,0.07);border:1px solid rgba(0,212,255,0.15);color:#e8f4f8">−</button>
+    <button class="cbtn" data-dd="-1" class="cbtn dias-btn" style="background:rgba(255,255,255,0.07);border:1px solid rgba(0,212,255,0.15);color:#e8f4f8">−</button>
     <div id="dv" style="font-family:'Bebas Neue',sans-serif;font-size:38px;color:#00d4ff;letter-spacing:2px;min-width:44px;text-align:center;line-height:1">1</div>
-    <button class="cbtn" onclick="chgD(1)" style="background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.3);color:#00d4ff">+</button>
+    <button class="cbtn" data-dd="1" class="cbtn dias-btn" style="background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.3);color:#00d4ff">+</button>
     <div style="color:#7a9bb5;font-size:13px" id="dl">diária de gravação</div>
   </div>
 </div>
@@ -122,9 +122,9 @@ input::placeholder{color:rgba(122,155,181,0.45)}
       </div>
     </div>
     <div style="display:flex;align-items:center;gap:7px">
-      <button class="cbtn" onclick="chgT('cinegrafista',-1)" style="width:28px;height:28px;background:rgba(255,255,255,0.07);border:1px solid rgba(0,212,255,0.15);color:#e8f4f8;font-size:17px">−</button>
+      <button class="cbtn" data-k="cinegrafista" data-d="-1" class="cbtn team-btn" style="width:28px;height:28px;background:rgba(255,255,255,0.07);border:1px solid rgba(0,212,255,0.15);color:#e8f4f8;font-size:17px">−</button>
       <span id="q-cinegrafista" style="font-family:'Bebas Neue',sans-serif;font-size:20px;min-width:18px;text-align:center;color:#00d4ff">1</span>
-      <button class="cbtn" onclick="chgT('cinegrafista',1)" style="width:28px;height:28px;background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.3);color:#00d4ff;font-size:17px">+</button>
+      <button class="cbtn" data-k="cinegrafista" data-d="1" class="cbtn team-btn" style="width:28px;height:28px;background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.3);color:#00d4ff;font-size:17px">+</button>
     </div>
     <div id="tt-cinegrafista" style="font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:#ffb800;min-width:88px;text-align:right">R$ 1.500,00</div>
   </div>
@@ -140,9 +140,9 @@ input::placeholder{color:rgba(122,155,181,0.45)}
       </div>
     </div>
     <div style="display:flex;align-items:center;gap:7px">
-      <button class="cbtn" onclick="chgT('assistente',-1)" style="width:28px;height:28px;background:rgba(255,255,255,0.07);border:1px solid rgba(0,212,255,0.15);color:#e8f4f8;font-size:17px">−</button>
+      <button class="cbtn" data-k="assistente" data-d="-1" class="cbtn team-btn" style="width:28px;height:28px;background:rgba(255,255,255,0.07);border:1px solid rgba(0,212,255,0.15);color:#e8f4f8;font-size:17px">−</button>
       <span id="q-assistente" style="font-family:'Bebas Neue',sans-serif;font-size:20px;min-width:18px;text-align:center;color:#7a9bb5">0</span>
-      <button class="cbtn" onclick="chgT('assistente',1)" style="width:28px;height:28px;background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.3);color:#00d4ff;font-size:17px">+</button>
+      <button class="cbtn" data-k="assistente" data-d="1" class="cbtn team-btn" style="width:28px;height:28px;background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.3);color:#00d4ff;font-size:17px">+</button>
     </div>
     <div id="tt-assistente" style="display:none;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:#ffb800;min-width:88px;text-align:right"></div>
   </div>
@@ -158,9 +158,9 @@ input::placeholder{color:rgba(122,155,181,0.45)}
       </div>
     </div>
     <div style="display:flex;align-items:center;gap:7px">
-      <button class="cbtn" onclick="chgT('fotografo',-1)" style="width:28px;height:28px;background:rgba(255,255,255,0.07);border:1px solid rgba(0,212,255,0.15);color:#e8f4f8;font-size:17px">−</button>
+      <button class="cbtn" data-k="fotografo" data-d="-1" class="cbtn team-btn" style="width:28px;height:28px;background:rgba(255,255,255,0.07);border:1px solid rgba(0,212,255,0.15);color:#e8f4f8;font-size:17px">−</button>
       <span id="q-fotografo" style="font-family:'Bebas Neue',sans-serif;font-size:20px;min-width:18px;text-align:center;color:#7a9bb5">0</span>
-      <button class="cbtn" onclick="chgT('fotografo',1)" style="width:28px;height:28px;background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.3);color:#00d4ff;font-size:17px">+</button>
+      <button class="cbtn" data-k="fotografo" data-d="1" class="cbtn team-btn" style="width:28px;height:28px;background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.3);color:#00d4ff;font-size:17px">+</button>
     </div>
     <div id="tt-fotografo" style="display:none;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:#ffb800;min-width:88px;text-align:right"></div>
   </div>
@@ -176,9 +176,9 @@ input::placeholder{color:rgba(122,155,181,0.45)}
       </div>
     </div>
     <div style="display:flex;align-items:center;gap:7px">
-      <button class="cbtn" onclick="chgT('editor',-1)" style="width:28px;height:28px;background:rgba(255,255,255,0.07);border:1px solid rgba(0,212,255,0.15);color:#e8f4f8;font-size:17px">−</button>
+      <button class="cbtn" data-k="editor" data-d="-1" class="cbtn team-btn" style="width:28px;height:28px;background:rgba(255,255,255,0.07);border:1px solid rgba(0,212,255,0.15);color:#e8f4f8;font-size:17px">−</button>
       <span id="q-editor" style="font-family:'Bebas Neue',sans-serif;font-size:20px;min-width:18px;text-align:center;color:#7a9bb5">0</span>
-      <button class="cbtn" onclick="chgT('editor',1)" style="width:28px;height:28px;background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.3);color:#00d4ff;font-size:17px">+</button>
+      <button class="cbtn" data-k="editor" data-d="1" class="cbtn team-btn" style="width:28px;height:28px;background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.3);color:#00d4ff;font-size:17px">+</button>
     </div>
     <div id="tt-editor" style="display:none;font-family:'Barlow Condensed',sans-serif;font-size:13px;font-weight:700;color:#ffb800;min-width:88px;text-align:right"></div>
   </div>
@@ -189,67 +189,67 @@ input::placeholder{color:rgba(122,155,181,0.45)}
   <div class="sec">Pós-produção / edição</div>
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
 
-    <div class="ei" id="ei-aftermovie" onclick="togE('aftermovie')">
+    <div class="ei" id="ei-aftermovie" id="ei-aftermovie" data-ek="aftermovie" class="ei edicao-btn">
       <div style="display:flex;align-items:center;justify-content:center;gap:5px;margin-bottom:7px">
         <div class="chk" id="chk-aftermovie"></div><span style="font-size:17px">🎞️</span>
       </div>
       <div style="font-size:12px;font-weight:600;margin-bottom:6px">Aftermovie</div>
-      <div style="display:flex;align-items:center;justify-content:center;gap:3px" onclick="event.stopPropagation()">
+      <div style="display:flex;align-items:center;justify-content:center;gap:3px">
         <span style="font-size:10px;color:#7a9bb5">R$</span>
         <input type="number" class="pi" id="ep-aftermovie" value="800" onchange="upd()" style="width:58px;text-align:center"/>
       </div>
     </div>
 
-    <div class="ei" id="ei-reels" onclick="togE('reels')">
+    <div class="ei" id="ei-reels" id="ei-reels" data-ek="reels" class="ei edicao-btn">
       <div style="display:flex;align-items:center;justify-content:center;gap:5px;margin-bottom:7px">
         <div class="chk" id="chk-reels"></div><span style="font-size:17px">📱</span>
       </div>
       <div style="font-size:12px;font-weight:600;margin-bottom:6px">Reels/cortes</div>
-      <div style="display:flex;align-items:center;justify-content:center;gap:3px" onclick="event.stopPropagation()">
+      <div style="display:flex;align-items:center;justify-content:center;gap:3px">
         <span style="font-size:10px;color:#7a9bb5">R$</span>
         <input type="number" class="pi" id="ep-reels" value="400" onchange="upd()" style="width:58px;text-align:center"/>
       </div>
     </div>
 
-    <div class="ei" id="ei-highlights" onclick="togE('highlights')">
+    <div class="ei" id="ei-highlights" id="ei-highlights" data-ek="highlights" class="ei edicao-btn">
       <div style="display:flex;align-items:center;justify-content:center;gap:5px;margin-bottom:7px">
         <div class="chk" id="chk-highlights"></div><span style="font-size:17px">✨</span>
       </div>
       <div style="font-size:12px;font-weight:600;margin-bottom:6px">Highlights</div>
-      <div style="display:flex;align-items:center;justify-content:center;gap:3px" onclick="event.stopPropagation()">
+      <div style="display:flex;align-items:center;justify-content:center;gap:3px">
         <span style="font-size:10px;color:#7a9bb5">R$</span>
         <input type="number" class="pi" id="ep-highlights" value="600" onchange="upd()" style="width:58px;text-align:center"/>
       </div>
     </div>
 
-    <div class="ei" id="ei-motion" onclick="togE('motion')">
+    <div class="ei" id="ei-motion" id="ei-motion" data-ek="motion" class="ei edicao-btn">
       <div style="display:flex;align-items:center;justify-content:center;gap:5px;margin-bottom:7px">
         <div class="chk" id="chk-motion"></div><span style="font-size:17px">🎨</span>
       </div>
       <div style="font-size:12px;font-weight:600;margin-bottom:6px">Motion Design</div>
-      <div style="display:flex;align-items:center;justify-content:center;gap:3px" onclick="event.stopPropagation()">
+      <div style="display:flex;align-items:center;justify-content:center;gap:3px">
         <span style="font-size:10px;color:#7a9bb5">R$</span>
         <input type="number" class="pi" id="ep-motion" value="1000" onchange="upd()" style="width:58px;text-align:center"/>
       </div>
     </div>
 
-    <div class="ei" id="ei-colorgrading" onclick="togE('colorgrading')">
+    <div class="ei" id="ei-colorgrading" id="ei-colorgrading" data-ek="colorgrading" class="ei edicao-btn">
       <div style="display:flex;align-items:center;justify-content:center;gap:5px;margin-bottom:7px">
         <div class="chk" id="chk-colorgrading"></div><span style="font-size:17px">🎞</span>
       </div>
       <div style="font-size:12px;font-weight:600;margin-bottom:6px">Color Grading</div>
-      <div style="display:flex;align-items:center;justify-content:center;gap:3px" onclick="event.stopPropagation()">
+      <div style="display:flex;align-items:center;justify-content:center;gap:3px">
         <span style="font-size:10px;color:#7a9bb5">R$</span>
         <input type="number" class="pi" id="ep-colorgrading" value="1000" onchange="upd()" style="width:58px;text-align:center"/>
       </div>
     </div>
 
-    <div class="ei" id="ei-rolo" onclick="togE('rolo')">
+    <div class="ei" id="ei-rolo" id="ei-rolo" data-ek="rolo" class="ei edicao-btn">
       <div style="display:flex;align-items:center;justify-content:center;gap:5px;margin-bottom:7px">
         <div class="chk" id="chk-rolo"></div><span style="font-size:17px">📽️</span>
       </div>
       <div style="font-size:12px;font-weight:600;margin-bottom:6px">Rolo de filme</div>
-      <div style="display:flex;align-items:center;justify-content:center;gap:3px" onclick="event.stopPropagation()">
+      <div style="display:flex;align-items:center;justify-content:center;gap:3px">
         <span style="font-size:10px;color:#7a9bb5">R$</span>
         <input type="number" class="pi" id="ep-rolo" value="1500" onchange="upd()" style="width:58px;text-align:center"/>
       </div>
@@ -262,7 +262,7 @@ input::placeholder{color:rgba(122,155,181,0.45)}
 <div class="card">
   <div class="sec">Transporte + alimentação por pessoa</div>
   <div style="display:flex;align-items:center;gap:14px">
-    <input type="range" id="tslider" min="0" max="400" step="25" value="175" style="flex:1;accent-color:#00d4ff;background:none;border:none;padding:0" oninput="chgTr()"/>
+    <input type="range" id="tslider" min="0" max="400" step="25" value="175" style="flex:1;accent-color:#00d4ff;background:none;border:none;padding:0" id="tslider" oninput="chgTr()"/>
     <div id="tval" style="font-family:'Bebas Neue',sans-serif;font-size:22px;color:#00d4ff;min-width:82px;letter-spacing:1px">R$ 175</div>
   </div>
   <div id="tinfo" style="font-size:12px;color:#7a9bb5;margin-top:5px">0 pessoas → total R$ 0,00</div>
@@ -272,7 +272,7 @@ input::placeholder{color:rgba(122,155,181,0.45)}
 <div class="card" style="border-color:rgba(0,212,255,0.24)">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
     <div class="sec" style="margin:0">Serviços adicionais VIVAI</div>
-    <button onclick="addC()" style="background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.28);border-radius:6px;padding:4px 12px;color:#00d4ff;font-size:12px;font-weight:600;cursor:pointer">+ Adicionar</button>
+    <button id="add-custom-btn" style="background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.28);border-radius:6px;padding:4px 12px;color:#00d4ff;font-size:12px;font-weight:600;cursor:pointer">+ Adicionar</button>
   </div>
   <div style="font-size:12px;color:#7a9bb5;margin-bottom:8px">Drone, live, motion, transmissão, etc.</div>
   <div id="clist"></div>
@@ -318,9 +318,9 @@ input::placeholder{color:rgba(122,155,181,0.45)}
     <div id="stotal" style="font-family:'Bebas Neue',sans-serif;font-size:30px;letter-spacing:1px;background:linear-gradient(90deg,#00d4ff,#ffb800);-webkit-background-clip:text;-webkit-text-fill-color:transparent">R$ 0,00</div>
   </div>
   <div id="sitems" style="font-size:11px;color:#7a9bb5;margin-bottom:14px;line-height:1.9"></div>
-  <button id="bcopy" class="btn-g" onclick="doCopy()">📋 Copiar orçamento</button>
-  <button class="btn-o" onclick="doPDF()">📄 Gerar Proposta PDF</button>
-  <button id="bcrm" class="btn-gr" onclick="doCRM()">💾 Salvar no CRM</button>
+  <button id="bcopy" class="btn-g" id="bcopy-btn">📋 Copiar orçamento</button>
+  <button class="btn-o" id="bpdf-btn">📄 Gerar Proposta PDF</button>
+  <button id="bcrm" class="btn-gr" id="bcrm-btn">💾 Salvar no CRM</button>
   <div id="crmok" style="display:none;text-align:center;font-size:12px;color:#27AE60;padding:4px 0;margin-top:4px">✓ Salvo no histórico do lead!</div>
 </div>
 </div>
@@ -328,6 +328,10 @@ input::placeholder{color:rgba(122,155,181,0.45)}
 </div><!-- fim grid -->
 
 <script>
+window.onerror = function(msg, src, line) {
+  document.title = 'ERRO: ' + msg + ' (linha ' + line + ')';
+  console.error('JS Error:', msg, 'line:', line);
+};
 // ── State ─────────────────────────────────────────────────────────────────
 const QT = {cinegrafista:1,assistente:0,fotografo:0,editor:0};
 const EDICOES = {aftermovie:false,reels:false,highlights:false,motion:false,colorgrading:false,rolo:false};
@@ -499,13 +503,13 @@ function calc(){
 // ── Update summary ─────────────────────────────────────────────────────────
 function upd(){
   const r=calc();
-  const client=gv('fc'),event=gv('fe'),date=gv('fd');
+  const client=gv('fc'),evt=gv('fe'),date=gv('fd');
   // client block
   const sc=document.getElementById('sclient');
   if(client||event){
     sc.style.display='block';
     document.getElementById('scn').textContent=client||'';
-    document.getElementById('sce').textContent=[event,date].filter(Boolean).join(' · ');
+    document.getElementById('sce').textContent=[evt,date].filter(Boolean).join(' · ');
   } else sc.style.display='none';
   // rows
   const row=(l,v,m,b)=>'<div class="sr"><span style="color:'+(m?'#7a9bb5':'#e8f4f8')+'">'+l+'</span><span style="font-weight:'+(b?700:400)+';font-family:'+(b?"'Barlow Condensed',sans-serif":"inherit")+'">'+v+'</span></div>';
