@@ -221,7 +221,23 @@ function QuoteApp() {
     }]);
 
   // ── PDF ────────────────────────────────────────────────────────────────────
-  const downloadPDF = async () => {
+  const downloadDOCX = async () => {
+    const r = calc();
+    const team_items = TEAM.filter(t=>team[t.key]>0).map(t=>({qty:team[t.key],label:t.label,price_unit:tPrices[t.key]||t.price,price_total:team[t.key]*(tPrices[t.key]||t.price)*diarias}));
+    const edicao_items = EDICOES.filter(e=>edicoes[e.key]).map(e=>({label:e.label,price:ePrices[e.key]||e.price}));
+    const payload = {client,event,date,location,notes,diarias,total:r.total,subtotal:r.sub,caixa:r.caixa,imposto:r.imposto,transport_total:r.transp,edicao_total:r.edicao,diaria_team:r.diaria,team_items,edicao_items};
+    try {
+      const resp = await fetch("/api/quote/docx",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+      if(!resp.ok) throw new Error("Erro ao gerar documento");
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      const name = (client||"proposta").replace(/[^a-zA-Z0-9]/g,"_");
+      a.href=url; a.download=`Proposta_VIVAI_${name}.docx`; a.click(); URL.revokeObjectURL(url);
+    } catch(e) { alert("Erro: "+e.message); }
+  };
+
+    const downloadPDF = async () => {
     setPdfLoading(true);
     const team_items = TEAM.filter(t=>team[t.key]>0).map(t=>({
       qty:team[t.key], label:t.label,
@@ -655,6 +671,13 @@ function QuoteApp() {
                     background:"transparent",color:C.cyan,fontSize:14,fontWeight:600,
                     fontFamily:"'Barlow',sans-serif",opacity:pdfLoading?0.6:1}}>
                   {pdfLoading ? "⏳ Gerando..." : "📄 Gerar Proposta PDF"}
+                </button>
+                <button onClick={downloadDOCX}
+                  style={{padding:"11px 16px",borderRadius:8,
+                    border:"1px solid rgba(39,174,96,0.4)",cursor:"pointer",
+                    background:"rgba(39,174,96,0.08)",color:"#27AE60",fontSize:14,fontWeight:600,
+                    fontFamily:"'Barlow',sans-serif",width:"100%",marginTop:4}}>
+                  📝 Gerar Google Docs (.docx)
                 </button>
               </div>
             </Card>
