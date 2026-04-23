@@ -130,11 +130,17 @@ app.post("/api/quote/pdf", async (req, res) => {
     const tmpOut = path.join(os.tmpdir(), `proposta_${Date.now()}.pdf`);
     const logoPath = path.join(__dirname, "logo.png");
     const pyScript = path.join(__dirname, "generate_pdf.py");
-    const jsonStr = JSON.stringify(data).replace(/'/g, "\'");
-    const logoArg = require("fs").existsSync(logoPath) ? ` '${logoPath}'` : "";
-    execSync(`python3 '${pyScript}' '${jsonStr}' '${tmpOut}'${logoArg}`, { timeout: 30000 });
-    const pdfBuffer = require("fs").readFileSync(tmpOut);
-    require("fs").unlinkSync(tmpOut);
+    const fs2 = require("fs");
+    const tmpJson = path.join(os.tmpdir(), `proposta_${Date.now()}.json`);
+    fs2.writeFileSync(tmpJson, JSON.stringify(data), "utf8");
+    const logoArg = fs2.existsSync(logoPath) ? ` '${logoPath}'` : "";
+    try {
+      execSync(`python3 '${pyScript}' '${tmpJson}' '${tmpOut}'${logoArg}`, { timeout: 30000 });
+    } finally {
+      try { fs2.unlinkSync(tmpJson); } catch(e) {}
+    }
+    const pdfBuffer = fs2.readFileSync(tmpOut);
+    fs2.unlinkSync(tmpOut);
     const clientName = (data.client || "proposta").replace(/[^a-zA-Z0-9]/g, "_");
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="Proposta_VIVAI_${clientName}.pdf"`);
@@ -145,6 +151,34 @@ app.post("/api/quote/pdf", async (req, res) => {
   }
 });
 
+
+
+// ── Gerador de DOCX ──────────────────────────────────────────────────────────
+app.post("/api/quote/docx", async (req, res) => {
+  try {
+    const data = req.body;
+    const ts = Date.now();
+    const tmpOut  = path.join(os.tmpdir(), `proposta_${ts}.docx`);
+    const tmpJson = path.join(os.tmpdir(), `proposta_${ts}.json`);
+    const pyScript = path.join(__dirname, "generate_docx.py");
+    const fs2 = require("fs");
+    fs2.writeFileSync(tmpJson, JSON.stringify(data), "utf8");
+    try {
+      execSync(`python3 '${pyScript}' '${tmpJson}' '${tmpOut}'`, { timeout: 30000 });
+    } finally {
+      try { fs2.unlinkSync(tmpJson); } catch(e) {}
+    }
+    const buf = fs2.readFileSync(tmpOut);
+    fs2.unlinkSync(tmpOut);
+    const clientName = (data.client || "proposta").replace(/[^a-zA-Z0-9]/g, "_");
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+    res.setHeader("Content-Disposition", `attachment; filename="Proposta_VIVAI_${clientName}.docx"`);
+    res.send(buf);
+  } catch (err) {
+    console.error("Erro ao gerar DOCX:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // ── Proxy IA — chat do painel de lead ────────────────────────────────────────
 async function callAnthropicWithRetry(params, retries = 3, delayMs = 2000) {
