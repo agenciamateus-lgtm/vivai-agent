@@ -9,12 +9,14 @@
       "stage": "Negociação",
       "value": 0,
       "tags": [
+        "Lead Quente",
         "Recorrente"
       ],
       "createdAt": "2026-04-04",
       "projeto": "JKB Veículos / Feirão JKB",
       "servico": "Planejamento e cobertura audiovisual do feirão",
-      "origem": "Cliente recorrente / relacionamento próximo"
+      "origem": "Cliente recorrente / relacionamento próximo",
+      "observacoes": "Cliente recorrente com boa abertura; oportunidade concreta."
     },
     {
       "id": 2,
@@ -24,11 +26,15 @@
       "company": "Conexão Família Automotiva",
       "stage": "Proposta",
       "value": 2600,
-      "tags": [],
+      "tags": [
+        "Lead Quente",
+        "Parceria"
+      ],
       "createdAt": "2026-04-04",
       "projeto": "Conexão Família Automotiva",
       "servico": "Parceria recorrente de produção de conteúdo",
-      "origem": "Pesquisa Sympla"
+      "origem": "Pesquisa Sympla",
+      "observacoes": "Lead quente, travado por timing financeiro."
     },
     {
       "id": 3,
@@ -37,14 +43,15 @@
       "phone": "",
       "company": "Auditari",
       "stage": "Proposta",
-      "value": 0,
+      "value": 2390,
       "tags": [
         "Indicação"
       ],
       "createdAt": "2026-04-04",
       "projeto": "Auditari",
       "servico": "Cobertura de evento com foto e vídeo",
-      "origem": "Indicação da Cris Piuga"
+      "origem": "Indicação da Cris Piuga",
+      "observacoes": "Evento na ACIGRA, Gravataí. Proposta completa enviada por R$ 2.390."
     },
     {
       "id": 4,
@@ -53,12 +60,15 @@
       "phone": "",
       "company": "Sense Barbearia",
       "stage": "Qualificado",
-      "value": 0,
-      "tags": [],
+      "value": 4500,
+      "tags": [
+        "Lead Quente"
+      ],
       "createdAt": "2026-04-04",
       "projeto": "Sense Barbearia",
       "servico": "Vídeo institucional e conteúdos para a barbearia",
-      "origem": "Relacionamento pré-existente / cliente da barbearia"
+      "origem": "Relacionamento pré-existente / cliente da barbearia",
+      "observacoes": "Lead quente."
     },
     {
       "id": 5,
@@ -68,11 +78,14 @@
       "company": "Grupo Lins Ferrão",
       "stage": "Lead",
       "value": 0,
-      "tags": [],
+      "tags": [
+        "Estratégico"
+      ],
       "createdAt": "2026-04-04",
       "projeto": "Grupo Lins Ferrão / Gang / Pompéia",
       "servico": "A definir",
-      "origem": "Contato direto"
+      "origem": "Contato direto",
+      "observacoes": "Contato estratégico institucional."
     },
     {
       "id": 6,
@@ -88,7 +101,8 @@
       "createdAt": "2026-04-04",
       "projeto": "Mu-Sush",
       "servico": "A definir",
-      "origem": "Indicação da Letícia da Growdev"
+      "origem": "Indicação da Letícia da Growdev",
+      "observacoes": "Boa chance de abertura por indicação."
     },
     {
       "id": 7,
@@ -97,12 +111,13 @@
       "phone": "",
       "company": "Brasa Fronteiriça",
       "stage": "Qualificado",
-      "value": 0,
+      "value": 3000,
       "tags": [],
       "createdAt": "2026-04-04",
       "projeto": "Brasa Fronteiriça",
       "servico": "Conteúdo audiovisual para gastronomia / marca",
-      "origem": "Networking no evento da LOLA"
+      "origem": "Networking no evento da LOLA",
+      "observacoes": "Lead em abordagem comercial ativa."
     },
     {
       "id": 8,
@@ -111,12 +126,15 @@
       "phone": "",
       "company": "LOLA",
       "stage": "Qualificado",
-      "value": 0,
-      "tags": [],
+      "value": 2500,
+      "tags": [
+        "Estratégico"
+      ],
       "createdAt": "2026-04-04",
       "projeto": "LOLA / Lola Talks",
       "servico": "Relacionamento para futuros eventos / potencial cobertura audiovisual",
-      "origem": "Instagram"
+      "origem": "Instagram",
+      "observacoes": "Lead estratégico de relacionamento."
     },
     {
       "id": 9,
@@ -125,12 +143,15 @@
       "phone": "",
       "company": "Festival de Música Gospel",
       "stage": "Qualificado",
-      "value": 0,
-      "tags": [],
+      "value": 5000,
+      "tags": [
+        "Estratégico"
+      ],
       "createdAt": "2026-04-04",
       "projeto": "Festival de Música Gospel",
       "servico": "Produção audiovisual / possível clipe oficial / festival",
-      "origem": ""
+      "origem": "",
+      "observacoes": "Potencial de projeto maior no futuro."
     },
     {
       "id": 10,
@@ -139,12 +160,15 @@
       "phone": "",
       "company": "Agência MKT",
       "stage": "Lead",
-      "value": 0,
-      "tags": [],
+      "value": 2500,
+      "tags": [
+        "Parceria"
+      ],
       "createdAt": "2026-04-04",
       "projeto": "Agência MKT",
       "servico": "Produções audiovisuais / publicidade / eventos",
-      "origem": "Grupo Criatives"
+      "origem": "Grupo Criatives",
+      "observacoes": "Potencial de parceria recorrente e indicação de jobs."
     },
     {
       "id": 11,
@@ -153,7 +177,7 @@
       "phone": "",
       "company": "ACAD Brasil",
       "stage": "Lead",
-      "value": 0,
+      "value": 4500,
       "tags": [],
       "createdAt": "2026-04-04",
       "projeto": "ACAD Brasil + CREF/RS Conexões",
@@ -167,7 +191,7 @@
       "phone": "",
       "company": "CEISC POA",
       "stage": "Lead",
-      "value": 0,
+      "value": 4500,
       "tags": [],
       "createdAt": "2026-04-04",
       "projeto": "Simulado Presencial 2ª Fase PC/RS Delegado",
@@ -181,7 +205,7 @@
       "phone": "",
       "company": "Lucas Martin / Produção do evento",
       "stage": "Lead",
-      "value": 0,
+      "value": 2500,
       "tags": [],
       "createdAt": "2026-04-04",
       "projeto": "Evento Zé Roberto em Porto Alegre",
@@ -209,7 +233,7 @@
       "phone": "",
       "company": "DVB Academy",
       "stage": "Lead",
-      "value": 0,
+      "value": 3000,
       "tags": [],
       "createdAt": "2026-04-04",
       "projeto": "DVB Academy / Master Class Dermo Beauty Expert",
@@ -228,7 +252,8 @@
       "createdAt": "2026-04-04",
       "projeto": "Workshop Conexão Plena 2ª Edição",
       "servico": "Cobertura de evento",
-      "origem": "Pesquisa Sympla"
+      "origem": "Pesquisa Sympla",
+      "observacoes": "Ticket estimado: R$ 2.500."
     },
     {
       "id": 17,
@@ -260,7 +285,8 @@
       "createdAt": "2026-04-04",
       "projeto": "Workshop Organização Financeira para Mulheres",
       "servico": "Cobertura de evento",
-      "origem": "Pesquisa Sympla"
+      "origem": "Pesquisa Sympla",
+      "observacoes": "Ticket estimado: R$ 2.000."
     },
     {
       "id": 19,
@@ -269,7 +295,7 @@
       "phone": "",
       "company": "3Up Talentos",
       "stage": "Lead",
-      "value": 0,
+      "value": 2500,
       "tags": [
         "Nutrir"
       ],
@@ -324,7 +350,25 @@
       "createdAt": "2026-04-04",
       "projeto": "South Summit / Ousaria Negócios",
       "servico": "Captação pontual estratégica",
-      "origem": "Instagram / anúncio"
+      "origem": "Instagram / anúncio",
+      "observacoes": "Ticket estimado: R$ 2.700."
+    },
+    {
+      "id": 23,
+      "name": "Rosi",
+      "email": "",
+      "phone": "",
+      "company": "Grupo Canção Nativa",
+      "stage": "Qualificado",
+      "value": 0,
+      "tags": [
+        "Indicação"
+      ],
+      "createdAt": "2026-04-29",
+      "projeto": "Grupo Canção Nativa",
+      "servico": "Movie maker / produção de vídeos",
+      "origem": "Indicação da Eve",
+      "observacoes": "Lead com abertura real e conversa já iniciada."
     }
   ],
   "interactions": [
@@ -489,6 +533,15 @@
       "note": "Contato esfriou e o prazo passou.",
       "author": "VIVAI",
       "date": "2026-04-04"
+    },
+    {
+      "id": 19,
+      "clientId": 23,
+      "clientName": "Rosi",
+      "type": "WhatsApp",
+      "note": "Perguntou como funciona o trabalho, se é por evento ou por pacote.",
+      "author": "VIVAI",
+      "date": "2026-04-29"
     }
   ],
   "tasks": [
@@ -678,6 +731,99 @@
       "assignee": "VIVAI",
       "done": false,
       "createdAt": "2026-04-07"
+    },
+    {
+      "id": 18,
+      "clientId": 23,
+      "clientName": "Rosi",
+      "title": "Responder explicando os formatos de pacote e entender a demanda do grupo.",
+      "dueDate": "2026-04-29",
+      "priority": "Média",
+      "assignee": "Mateus",
+      "done": false,
+      "createdAt": "2026-04-29"
     }
-  ]
+  ],
+  "leadScores": {
+    "1": {
+      "score": 85,
+      "temp": "quente",
+      "summary": "Em negociação, vídeo piloto gravado, aguardando entrega"
+    },
+    "2": {
+      "score": 70,
+      "temp": "quente",
+      "summary": "Proposta aceita mas sem caixa, aguardando momento"
+    },
+    "3": {
+      "score": 65,
+      "temp": "quente",
+      "summary": "Comparando orçamentos, proposta em análise ativa"
+    },
+    "4": {
+      "score": 60,
+      "temp": "morno",
+      "summary": "Qualificado interessado, aguardando reunião presencial agendada"
+    },
+    "5": {
+      "score": 45,
+      "temp": "morno",
+      "summary": "Aguardando decisão interna, relacionamento sendo mantido"
+    },
+    "6": {
+      "score": 50,
+      "temp": "morno",
+      "summary": "Lead por indicação, contato inicial pendente"
+    },
+    "7": {
+      "score": 55,
+      "temp": "morno",
+      "summary": "Qualificado, reunião presencial sendo agendada esta semana"
+    },
+    "8": {
+      "score": 40,
+      "temp": "morno",
+      "summary": "Foco em networking, sem proposta comercial definida"
+    },
+    "9": {
+      "score": 35,
+      "temp": "frio",
+      "summary": "Interessado mas aguardando evento futuro indefinido"
+    },
+    "10": {
+      "score": 30,
+      "temp": "frio",
+      "summary": "Material enviado, aguardando resposta sem engajamento"
+    },
+    "11": {
+      "score": 15,
+      "temp": "frio",
+      "summary": "Sem interação, apenas follow-up eventual planejado"
+    },
+    "12": {
+      "score": 15,
+      "temp": "frio",
+      "summary": "Sem interação, apenas follow-up eventual planejado"
+    },
+    "13": {
+      "score": 20,
+      "temp": "frio",
+      "summary": "Sem interação registrada, apenas acompanhamento passivo"
+    },
+    "14": {
+      "score": 25,
+      "temp": "frio",
+      "summary": "Empresa indefinida, decisor ainda não localizado"
+    },
+    "15": {
+      "score": 10,
+      "temp": "frio",
+      "summary": "Sem retorno após follow-up, aguardando novo gancho"
+    },
+    "23": {
+      "score": 55,
+      "temp": "morno",
+      "summary": "Qualificado por indicação, conversa iniciada com abertura real"
+    }
+  }
 }
