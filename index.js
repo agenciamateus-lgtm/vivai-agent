@@ -20,11 +20,18 @@ app.use(bodyParser.json({ limit: "10mb" }));
 
 // ── PostgreSQL ────────────────────────────────────────────────────────────────
 const { Pool } = require("pg");
+
+if (!process.env.DATABASE_URL) {
+  console.error("❌ DATABASE_URL não definida. Configure no Railway > Variables.");
+  process.exit(1);
+}
+const dbUrlMasked = process.env.DATABASE_URL.replace(/:\/\/[^@]+@/, "://*****@");
+console.log("🔌 Banco:", dbUrlMasked);
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL?.includes("railway")
-    ? { rejectUnauthorized: false }
-    : false,
+  ssl: { rejectUnauthorized: false },
+  connectionTimeoutMillis: 10000,
 });
 
 async function initDB() {
