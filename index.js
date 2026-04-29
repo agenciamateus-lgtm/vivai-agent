@@ -1,201 +1,157 @@
 /**
- * index.js — Servidor principal do Agente VIVAI
- * Recebe webhooks do Twilio (WhatsApp) e responde via Claude
+ * index.js — Servidor principal VIVAI
+ * Banco de dados: PostgreSQL (Railway)
  */
 
 require("dotenv").config();
 
 const express    = require("express");
 const bodyParser = require("body-parser");
-const twilio     = require("twilio");
-const { processMessage } = require("./agent");
+const path       = require("path");
+const { execSync } = require("child_process");
+const os         = require("os");
+const fs         = require("fs");
 
 const app  = express();
-const port = process.env.PORT || 3000;
+const port = process.env.PORT || 8080;
 
-const twilioClient = twilio(
-  process.env.TWILIO_ACCOUNT_SID,
-  process.env.TWILIO_AUTH_TOKEN
-);
-
-// ── Middleware ────────────────────────────────────────────────────────────────
 app.use(bodyParser.urlencoded({ extended: false }));
-app.use(bodyParser.json());
+app.use(bodyParser.json({ limit: "10mb" }));
 
-// ── Dashboard ─────────────────────────────────────────────────────────────────
-const path = require("path");
-const fs   = require("fs");
-const DATA_FILE = path.join(__dirname, "crm-data.json");
-
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "dashboard.html"));
+// ── PostgreSQL ────────────────────────────────────────────────────────────────
+const { Pool } = require("pg");
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL?.includes("railway")
+    ? { rejectUnauthorized: false }
+    : false,
 });
 
-app.get("/quote", (req, res) => {
-  res.sendFile(path.join(__dirname, "quote.html"));
-});
+async function initDB() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS crm_data (
+      key        TEXT PRIMARY KEY,
+      value      JSONB NOT NULL DEFAULT '[]'::jsonb,
+      updated_at TIMESTAMPTZ DEFAULT NOW()
+    );
+    INSERT INTO crm_data (key, value) VALUES
+      ('clients',      '[]'::jsonb),
+      ('interactions', '[]'::jsonb),
+      ('tasks',        '[]'::jsonb),
+      ('finance',      '[]'::jsonb)
+    ON CONFLICT (key) DO NOTHING;
+  `);
 
-// API: leitura dos dados
-app.get("/api/data", (req, res) => {
+  // Migração automática do JSON local (se existir)
+  const localFile = path.join(__dirname, "crm-data.json");
+  if (fs.existsSync(localFile)) {
+    try {
+      const local = JSON.parse(fs.readFileSync(localFile, "utf-8"));
+      for (const [key, value] of Object.entries(local)) {
+        if (Array.isArray(value) && value.length > 0) {
+          await pool.query(
+            `INSERT INTO crm_data (key, value) VALUES ($1, $2::jsonb)
+             ON CONFLICT (key) DO UPDATE SET value = $2::jsonb, updated_at = NOW()`,
+            [key, JSON.stringify(value)]
+          );
+        }
+      }
+      fs.renameSync(localFile, localFile + ".migrated");
+      console.log("✅ Dados migrados do JSON para PostgreSQL");
+    } catch (e) {
+      console.error("⚠️  Migração:", e.message);
+    }
+  }
+
+  console.log("✅ PostgreSQL pronto");
+}
+
+async function readData() {
+  const { rows } = await pool.query("SELECT key, value FROM crm_data");
+  return Object.fromEntries(rows.map(r => [r.key, r.value]));
+}
+
+async function writeData(updates) {
+  for (const [key, value] of Object.entries(updates)) {
+    await pool.query(
+      `INSERT INTO crm_data (key, value) VALUES ($1, $2::jsonb)
+       ON CONFLICT (key) DO UPDATE SET value = $2::jsonb, updated_at = NOW()`,
+      [key, JSON.stringify(value)]
+    );
+  }
+}
+
+// ── Páginas ───────────────────────────────────────────────────────────────────
+app.get("/",      (req, res) => res.sendFile(path.join(__dirname, "dashboard.html")));
+app.get("/quote", (req, res) => res.sendFile(path.join(__dirname, "quote.html")));
+
+// ── API CRM ───────────────────────────────────────────────────────────────────
+app.get("/api/data", async (req, res) => {
   try {
-    const data = fs.existsSync(DATA_FILE) ? JSON.parse(fs.readFileSync(DATA_FILE, "utf-8")) : { clients: [], interactions: [], tasks: [] };
-    res.json(data);
+    res.json(await readData());
   } catch (e) {
+    console.error("GET /api/data:", e.message);
     res.json({ clients: [], interactions: [], tasks: [] });
   }
 });
 
-// API: atualização parcial dos dados
-app.post("/api/data", (req, res) => {
+app.post("/api/data", async (req, res) => {
   try {
-    const current = fs.existsSync(DATA_FILE) ? JSON.parse(fs.readFileSync(DATA_FILE, "utf-8")) : { clients: [], interactions: [], tasks: [] };
-    const updated = { ...current, ...req.body };
-    fs.writeFileSync(DATA_FILE, JSON.stringify(updated, null, 2));
+    await writeData(req.body);
     res.json({ ok: true });
   } catch (e) {
+    console.error("POST /api/data:", e.message);
     res.status(500).json({ error: e.message });
   }
 });
 
-// ── Webhook do WhatsApp (Twilio) ──────────────────────────────────────────────
-app.post("/webhook/whatsapp", async (req, res) => {
-  // Validar assinatura Twilio (segurança)
-  // Validação de assinatura ignorada no sandbox — segura para desenvolvimento
-  // Para produção com número aprovado, reativar a validação
-
-  const from    = req.body.From;
-  const message = req.body.Body?.trim() || "";
-  const numMedia = parseInt(req.body.NumMedia || "0", 10);
-
-  if (!from) return res.status(400).send("Bad Request");
-
-  // Coletar mídias (imagens, áudios)
-  const mediaList = [];
-  for (let i = 0; i < numMedia; i++) {
-    mediaList.push({
-      url: req.body[`MediaUrl${i}`],
-      contentType: req.body[`MediaContentType${i}`],
-    });
-  }
-
-  console.log(`📩 [${from}]: ${message || "(sem texto)"}${mediaList.length ? ` + ${mediaList.length} mídia(s)` : ""}`);
-
-  // Resposta imediata ao Twilio
-  res.set("Content-Type", "text/xml");
-  res.send("<Response></Response>");
-
-  // Processar com IA
-  try {
-    const reply = await processMessage(from, message, mediaList);
-    console.log(`🤖 [resposta para ${from}]: ${reply.substring(0, 100)}...`);
-
-    await twilioClient.messages.create({
-      from: process.env.TWILIO_WHATSAPP_NUMBER,
-      to: from,
-      body: reply,
-    });
-  } catch (err) {
-    console.error("❌ Erro ao processar mensagem:", err);
-    try {
-      await twilioClient.messages.create({
-        from: process.env.TWILIO_WHATSAPP_NUMBER,
-        to: from,
-        body: "Ocorreu um erro interno. Por favor, tente novamente em instantes.",
-      });
-    } catch (_) {}
-  }
-});
-
-// ── Endpoint de teste (sem WhatsApp) ─────────────────────────────────────────
-app.post("/test", async (req, res) => {
-  const { userId = "test-user", message } = req.body;
-  if (!message) return res.status(400).json({ error: "message é obrigatório" });
-
-  try {
-    const reply = await processMessage(userId, message);
-    res.json({ reply });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-
-// ── Gerador de PDF de proposta ────────────────────────────────────────────────
-const { execSync } = require("child_process");
-const os = require("os");
-
+// ── PDF ───────────────────────────────────────────────────────────────────────
 app.post("/api/quote/pdf", async (req, res) => {
   try {
-    const data = req.body;
-    const tmpOut = path.join(os.tmpdir(), `proposta_${Date.now()}.pdf`);
-    const logoPath = path.join(__dirname, "logo.png");
+    const ts = Date.now();
+    const tmpJson = path.join(os.tmpdir(), `p_${ts}.json`);
+    const tmpOut  = path.join(os.tmpdir(), `p_${ts}.pdf`);
     const pyScript = path.join(__dirname, "generate_pdf.py");
-    const fs2 = require("fs");
-    const tmpJson = path.join(os.tmpdir(), `proposta_${Date.now()}.json`);
-    fs2.writeFileSync(tmpJson, JSON.stringify(data), "utf8");
-    const logoArg = fs2.existsSync(logoPath) ? ` '${logoPath}'` : "";
-    try {
-      execSync(`python3 '${pyScript}' '${tmpJson}' '${tmpOut}'${logoArg}`, { timeout: 30000 });
-    } finally {
-      try { fs2.unlinkSync(tmpJson); } catch(e) {}
-    }
-    const pdfBuffer = fs2.readFileSync(tmpOut);
-    fs2.unlinkSync(tmpOut);
-    const clientName = (data.client || "proposta").replace(/[^a-zA-Z0-9]/g, "_");
+    const logoPath = path.join(__dirname, "logo.png");
+    fs.writeFileSync(tmpJson, JSON.stringify(req.body), "utf8");
+    const logoArg = fs.existsSync(logoPath) ? ` '${logoPath}'` : "";
+    try { execSync(`python3 '${pyScript}' '${tmpJson}' '${tmpOut}'${logoArg}`, { timeout: 30000 }); }
+    finally { try { fs.unlinkSync(tmpJson); } catch (_) {} }
+    const buf = fs.readFileSync(tmpOut); fs.unlinkSync(tmpOut);
+    const name = (req.body.client || "proposta").replace(/[^a-zA-Z0-9]/g, "_");
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="Proposta_VIVAI_${clientName}.pdf"`);
-    res.send(pdfBuffer);
-  } catch (err) {
-    console.error("Erro ao gerar PDF:", err.message);
-    res.status(500).json({ error: err.message });
-  }
+    res.setHeader("Content-Disposition", `attachment; filename="Proposta_VIVAI_${name}.pdf"`);
+    res.send(buf);
+  } catch (err) { console.error("PDF:", err.message); res.status(500).json({ error: err.message }); }
 });
 
-
-
-// ── Gerador de DOCX ──────────────────────────────────────────────────────────
+// ── DOCX ──────────────────────────────────────────────────────────────────────
 app.post("/api/quote/docx", async (req, res) => {
   try {
-    const data = req.body;
     const ts = Date.now();
-    const tmpOut  = path.join(os.tmpdir(), `proposta_${ts}.docx`);
-    const tmpJson = path.join(os.tmpdir(), `proposta_${ts}.json`);
+    const tmpJson = path.join(os.tmpdir(), `p_${ts}.json`);
+    const tmpOut  = path.join(os.tmpdir(), `p_${ts}.docx`);
     const pyScript = path.join(__dirname, "generate_docx.py");
-    const fs2 = require("fs");
-    fs2.writeFileSync(tmpJson, JSON.stringify(data), "utf8");
-    try {
-      execSync(`python3 '${pyScript}' '${tmpJson}' '${tmpOut}'`, { timeout: 30000 });
-    } finally {
-      try { fs2.unlinkSync(tmpJson); } catch(e) {}
-    }
-    const buf = fs2.readFileSync(tmpOut);
-    fs2.unlinkSync(tmpOut);
-    const clientName = (data.client || "proposta").replace(/[^a-zA-Z0-9]/g, "_");
+    fs.writeFileSync(tmpJson, JSON.stringify(req.body), "utf8");
+    try { execSync(`python3 '${pyScript}' '${tmpJson}' '${tmpOut}'`, { timeout: 30000 }); }
+    finally { try { fs.unlinkSync(tmpJson); } catch (_) {} }
+    const buf = fs.readFileSync(tmpOut); fs.unlinkSync(tmpOut);
+    const name = (req.body.client || "proposta").replace(/[^a-zA-Z0-9]/g, "_");
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
-    res.setHeader("Content-Disposition", `attachment; filename="Proposta_VIVAI_${clientName}.docx"`);
+    res.setHeader("Content-Disposition", `attachment; filename="Proposta_VIVAI_${name}.docx"`);
     res.send(buf);
-  } catch (err) {
-    console.error("Erro ao gerar DOCX:", err.message);
-    res.status(500).json({ error: err.message });
-  }
+  } catch (err) { console.error("DOCX:", err.message); res.status(500).json({ error: err.message }); }
 });
 
-// ── Proxy IA — chat do painel de lead ────────────────────────────────────────
-async function callAnthropicWithRetry(params, retries = 3, delayMs = 2000) {
-  const Anthropic = require("@anthropic-ai/sdk");
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-  for (let attempt = 1; attempt <= retries; attempt++) {
-    try {
-      return await client.messages.create(params);
-    } catch (err) {
-      const isOverloaded = err.status === 529 || (err.message && err.message.includes("overloaded"));
-      const isRateLimit  = err.status === 429;
-      if ((isOverloaded || isRateLimit) && attempt < retries) {
-        const wait = delayMs * attempt;
-        console.log(`⏳ Anthropic overloaded (attempt ${attempt}/${retries}), retrying in ${wait}ms...`);
-        await new Promise(r => setTimeout(r, wait));
-        continue;
-      }
+// ── IA ────────────────────────────────────────────────────────────────────────
+async function callAI(params, retries = 3, delay = 2000) {
+  const { default: Anthropic } = await import("@anthropic-ai/sdk");
+  const ai = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  for (let i = 1; i <= retries; i++) {
+    try { return await ai.messages.create(params); }
+    catch (err) {
+      const retry = err.status === 529 || err.status === 429 || (err.message||"").includes("overloaded");
+      if (retry && i < retries) { await new Promise(r => setTimeout(r, delay * i)); continue; }
       throw err;
     }
   }
@@ -204,96 +160,73 @@ async function callAnthropicWithRetry(params, retries = 3, delayMs = 2000) {
 app.post("/api/chat", async (req, res) => {
   try {
     const { system, messages, max_tokens } = req.body;
-    const response = await callAnthropicWithRetry({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: max_tokens || 600,
-      system,
-      messages,
-    });
-    res.json({ content: response.content });
+    const r = await callAI({ model: "claude-sonnet-4-20250514", max_tokens: max_tokens||600, system, messages });
+    res.json({ content: r.content });
   } catch (err) {
-    const status = err.status || 500;
-    console.error(`❌ /api/chat error: ${status}`, err.message);
-    // Return user-friendly message for overloaded errors
-    if (status === 529 || (err.message && err.message.includes("overloaded"))) {
-      return res.status(529).json({
-        content: [{ type: "text", text: "⏳ A IA está temporariamente sobrecarregada. Aguarde alguns segundos e tente novamente." }]
-      });
-    }
-    res.status(status).json({ error: err.message });
+    if (err.status === 529 || (err.message||"").includes("overloaded"))
+      return res.status(529).json({ content: [{ type:"text", text:"⏳ IA sobrecarregada, tente novamente." }] });
+    res.status(err.status||500).json({ error: err.message });
   }
 });
 
-
-// ── Análise de leads com IA ───────────────────────────────────────────────────
 app.post("/api/analyze-leads", async (req, res) => {
   try {
-    const { clients, interactions, tasks } = req.body;
-    const Anthropic = require("@anthropic-ai/sdk");
-    const ai = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-    // Build context for all active clients
-    const active = (clients || []).filter(c => c.stage !== "Fechado").slice(0, 15);
-    const clientsContext = active.map(c => {
-      const ints = (interactions || []).filter(i => i.clientId === c.id).slice(0, 3);
-      const tks  = (tasks || []).filter(t => t.clientId === c.id && !t.done);
-      return {
-        id: c.id, name: c.name, company: c.company,
-        stage: c.stage, value: c.value,
-        interactions: ints.map(i => `${i.date} [${i.type}]: ${i.note}`),
-        pendingTasks: tks.map(t => t.title),
-      };
-    });
-
-    const response = await callAnthropicWithRetry({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 2000,
-      messages: [{
-        role: "user",
-        content: `Você é um analista de CRM da VIVAI Studio Audiovisual.
-Analise os seguintes leads e retorne APENAS um JSON válido (sem markdown):
-
-{
-  "scores": {
-    "<id numérico>": {
-      "score": <0-100>,
-      "temp": "<quente|morno|frio>",
-      "summary": "<frase curta de 8-12 palavras sobre o estado do lead>"
-    }
-  }
-}
-
-Critérios:
-- quente: interesse claro, contato recente, em negociação/proposta, score >= 65
-- morno: interesse mas travado, sem contato há 1-2 semanas, score 35-64
-- frio: sem movimento, contato antigo, sem interesse claro, score < 35
-
-Leads para analisar:
-${JSON.stringify(clientsContext, null, 2)}`
-      }]
-    });
-
-    const raw = response.content.find(b => b.type === "text")?.text || "{}";
-    const clean = raw.replace(/\`\`\`json|\`\`\`/g, "").trim();
-    const data = JSON.parse(clean);
-
-    // Ensure all IDs are numbers
+    const { clients=[], interactions=[], tasks=[] } = req.body;
+    const active = clients.filter(c => c.stage !== "Fechado").slice(0, 15).map(c => ({
+      id: c.id, name: c.name, stage: c.stage, value: c.value,
+      interactions: interactions.filter(i=>i.clientId===c.id).slice(0,3).map(i=>`${i.date} [${i.type}]: ${i.note}`),
+      tasks: tasks.filter(t=>t.clientId===c.id&&!t.done).map(t=>t.title),
+    }));
+    const r = await callAI({ model:"claude-sonnet-4-20250514", max_tokens:2000, messages:[{
+      role:"user",
+      content:`Analise os leads VIVAI Studio e retorne APENAS JSON:\n{"scores":{"<id>":{"score":<0-100>,"temp":"<quente|morno|frio>","summary":"<frase curta>"}}}\nquente>=65 morno=35-64 frio<35\nLeads:${JSON.stringify(active)}`
+    }]});
+    const raw = r.content.find(b=>b.type==="text")?.text||"{}";
+    const parsed = JSON.parse(raw.replace(/```json|```/g,"").trim());
     const scores = {};
-    Object.entries(data.scores || {}).forEach(([k, v]) => {
-      scores[Number(k)] = v;
-    });
-
-    console.log(`🧠 Leads analisados: ${Object.keys(scores).length}`);
+    Object.entries(parsed.scores||{}).forEach(([k,v])=>{ scores[Number(k)]=v; });
     res.json({ scores });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ── WhatsApp ──────────────────────────────────────────────────────────────────
+const twilio = require("twilio");
+const twilioClient = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+
+app.post("/webhook/whatsapp", async (req, res) => {
+  const from = req.body.From;
+  const message = req.body.Body?.trim() || "";
+  const numMedia = parseInt(req.body.NumMedia||"0",10);
+  if (!from) return res.status(400).send("Bad Request");
+  const mediaList = [];
+  for (let i=0;i<numMedia;i++) mediaList.push({ url:req.body[`MediaUrl${i}`], contentType:req.body[`MediaContentType${i}`] });
+  console.log(`📩 [${from}]: ${message||"(sem texto)"}${mediaList.length?` + ${mediaList.length} mídia(s)`:""}`);
+  res.set("Content-Type","text/xml");
+  res.send("<Response></Response>");
+  try {
+    const { processMessage } = require("./agent");
+    const reply = await processMessage(from, message, mediaList);
+    await twilioClient.messages.create({ from:process.env.TWILIO_WHATSAPP_NUMBER, to:from, body:reply });
   } catch (err) {
-    console.error("❌ /api/analyze-leads:", err.message);
-    res.status(500).json({ error: err.message });
+    console.error("❌ Webhook:", err.message);
+    try { await twilioClient.messages.create({ from:process.env.TWILIO_WHATSAPP_NUMBER, to:from, body:"Erro interno. Tente novamente." }); } catch(_){}
   }
 });
 
-// ── Start ─────────────────────────────────────────────────────────────────────
-app.listen(port, () => {
-  console.log(`\n🌿 VIVAI Agent rodando na porta ${port}`);
-  console.log(`   Webhook: POST /webhook/whatsapp`);
-  console.log(`   Teste:   POST /test\n`);
+app.post("/test", async (req, res) => {
+  const { userId="test-user", message } = req.body;
+  if (!message) return res.status(400).json({ error:"message obrigatório" });
+  try {
+    const { processMessage } = require("./agent");
+    res.json({ reply: await processMessage(userId, message) });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
+
+// ── Boot ──────────────────────────────────────────────────────────────────────
+initDB()
+  .then(() => app.listen(port, () => {
+    console.log(`\n🌿 VIVAI Agent rodando na porta ${port}`);
+    console.log(`   Webhook: POST /webhook/whatsapp`);
+    console.log(`   Teste:   POST /test\n`);
+  }))
+  .catch(err => { console.error("❌ Banco:", err.message); process.exit(1); });
